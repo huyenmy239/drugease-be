@@ -41,7 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
 
     'apps.accounts',
-    'apps.inventory',
+    'apps.warehouse',
     'apps.prescriptions',
     'apps.reports', 
 ]
