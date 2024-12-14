@@ -1,5 +1,6 @@
 from django.db import models
 from apps.accounts.models import Employee
+from apps.prescriptions.models import Prescription
 
 class Warehouse(models.Model):
     id = models.AutoField(primary_key=True)
@@ -47,6 +48,7 @@ class ExportReceipt(models.Model):
     warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name='export_receipts')
     export_date = models.DateTimeField()
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='export_receipts')
+    prescription = models.OneToOneField(Prescription, on_delete=models.CASCADE, related_name='export_receipts')
 
     class Meta:
         db_table = 'export_receipt'

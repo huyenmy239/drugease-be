@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-f*@#fpmw&da@_b+-cute_ba93$*@*tao2$gkgb@ep=$$wzk&40
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
+    'rest_framework.authtoken',
+    'corsheaders',
 
     'apps.accounts',
     'apps.warehouse',
@@ -46,15 +48,20 @@ INSTALLED_APPS = [
     'apps.reports', 
 ]
 
+AUTH_USER_MODEL = "accounts.Account"
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+CORS_ALLOW_ALL_ORIGINS = True
 
 ROOT_URLCONF = 'drugease.urls'
 
@@ -83,7 +90,7 @@ WSGI_APPLICATION = 'drugease.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'drug',
+        'NAME': 'drugease',
         'USER': 'root',
         'PASSWORD': '239003',
         'HOST': 'localhost',
