@@ -10,6 +10,7 @@ class Employee(models.Model):
     address = models.CharField(max_length=200)
     email = models.EmailField(unique=True)
     image = models.TextField()
+    is_active = models.BooleanField(default=1)
 
     class Meta:
         db_table = 'employee'

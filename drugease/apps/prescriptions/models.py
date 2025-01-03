@@ -12,6 +12,7 @@ class Patient(models.Model):
     email = models.EmailField(unique=True, null=True, blank=True)
     registration_date = models.DateTimeField(auto_now_add=True)
     insurance = models.FloatField(default=0.0)
+    nguoi_giam_ho = models.CharField(max_length=50, default="Không có");
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='patients')
 
     class Meta:

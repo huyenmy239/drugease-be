@@ -12,14 +12,15 @@ class DoctorField(serializers.PrimaryKeyRelatedField):
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = ['id', 'full_name', 'date_of_birth', 'gender', 'id_card', 'phone_number', 'address', 'email', 'registration_date', 'insurance', 'employee']
+        fields = ['id', 'full_name', 'date_of_birth', 'gender', 'id_card', 'phone_number', 'address', 'email', 'registration_date', 'insurance', 'employee',"nguoi_giam_ho"]
 
     def update(self, instance, validated_data):
         email = validated_data.get('email', instance.email)
         phone_number = validated_data.get('phone_number', instance.phone_number)
-
+        giamho = validated_data.get('nguoi_giam_ho', instance.nguoi_giam_ho)
         instance.email = email
         instance.phone_number = phone_number
+        instance.nguoi_giam_ho = giamho
         instance.save()
         return instance
 
@@ -42,8 +43,14 @@ class PrescriptionDetailSerializer(serializers.ModelSerializer):
         model = PrescriptionDetail
         fields = ['id', 'prescription', 'medicine', 'medicine_name', 'quantity', 'usage_instruction']
 
+
+class DoctorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Employee
+        fields = ['id', 'full_name']
+
 class PrescriptionViewSerializer(serializers.ModelSerializer):
-    doctor = DoctorField(queryset=Employee.objects.all())
+    doctor = DoctorSerializer()
     details = PrescriptionDetailSerializer(many=True, read_only=True)
     patient = PatientNameSerializer()
 

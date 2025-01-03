@@ -6,6 +6,7 @@ class Warehouse(models.Model):
     id = models.AutoField(primary_key=True)
     warehouse_name = models.CharField(max_length=100)
     address = models.CharField(max_length=200)
+    is_active = models.BooleanField(default=1)
 
     class Meta:
         db_table = 'warehouse'
@@ -17,7 +18,6 @@ class Medicine(models.Model):
     sale_price = models.FloatField()
     description = models.CharField(max_length=200)
     stock_quantity = models.IntegerField(default=0)
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='medicines')
 
     class Meta:
         db_table = 'medicine'
@@ -28,6 +28,7 @@ class ImportReceipt(models.Model):
     warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name='import_receipts')
     total_amount = models.FloatField()
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='import_receipts')
+    is_approved = models.BooleanField(default=0)
 
     class Meta:
         db_table = 'import_receipt'
@@ -49,6 +50,7 @@ class ExportReceipt(models.Model):
     export_date = models.DateTimeField()
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='export_receipts')
     prescription = models.OneToOneField(Prescription, on_delete=models.CASCADE, related_name='export_receipts')
+    is_approved = models.BooleanField(default=0)
 
     class Meta:
         db_table = 'export_receipt'
