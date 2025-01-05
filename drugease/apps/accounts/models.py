@@ -2,14 +2,14 @@ from django.db import models
 
 class Employee(models.Model):
     id = models.AutoField(primary_key=True)
-    full_name = models.CharField(max_length=50)
-    date_of_birth = models.DateField()
+    full_name = models.CharField(max_length=50, null=False)
+    date_of_birth = models.DateField(null=False)
     gender = models.BooleanField(default=0)
-    id_card = models.CharField(max_length=12, unique=True)
-    phone_number = models.CharField(max_length=12)
-    address = models.CharField(max_length=200)
-    email = models.EmailField(unique=True)
-    image = models.TextField()
+    id_card = models.CharField(max_length=12, unique=True, null=False)
+    phone_number = models.CharField(max_length=12, null=False)
+    address = models.CharField(max_length=200, null=False)
+    email = models.EmailField(unique=True, null=False)
+    image = models.TextField(null=True, blank=True) # Add default image later
     is_active = models.BooleanField(default=1)
 
     class Meta:
