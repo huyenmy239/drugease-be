@@ -273,6 +273,43 @@ class WarehouseListAPIView(APIView):
         )
 
 
+class WarehouseDetailAPIView(APIView):
+    def get(self, request, pk):
+        try:
+            # Lấy chi tiết kho theo ID (pk)
+            warehouse = Warehouse.objects.get(pk=pk)
+            serializer = WarehouseSerializer(warehouse)
+
+            # Tạo response JSON
+            response = {
+                "statusCode": status.HTTP_200_OK,
+                "status": "success",
+                "data": serializer.data,
+                "errorMessage": None,
+            }
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Warehouse.DoesNotExist:
+            # Trả về lỗi nếu kho không tồn tại
+            response = {
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "status": "error",
+                "data": None,
+                "errorMessage": "Warehouse not found.",
+            }
+            return Response(response, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            # Trả về lỗi cho các trường hợp ngoại lệ khác
+            response = {
+                "statusCode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "data": None,
+                "errorMessage": str(e),
+            }
+            return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class WarehouseViewSet(viewsets.ModelViewSet):
     queryset = Warehouse.objects.all()
     serializer_class = WarehouseSerializer
@@ -424,9 +461,9 @@ class ImportReceiptListAPIView(APIView):
 
     def get(self, request):
         import_receipts = ImportReceipt.objects.all()
-        search_query = request.query_params.get("q", None)
-        if search_query:
-            import_receipts = import_receipts.filter(warehouse__warehouse_name__icontains=search_query)
+        # search_query = request.query_params.get("q", None)
+        # if search_query:
+        #     import_receipts = import_receipts.filter(warehouse__warehouse_name__icontains=search_query)
 
         data = [
             {
@@ -434,7 +471,7 @@ class ImportReceiptListAPIView(APIView):
                 "import_date": receipt.import_date.strftime("%d/%m/%Y %H:%M"),
                 "warehouse_name": receipt.warehouse.warehouse_name,
                 "total_amount": receipt.total_amount,
-                "employee_name": receipt.employee.name,
+                "employee_name": receipt.employee.full_name,
                 "is_approved": receipt.is_approved,
             }
             for receipt in import_receipts
@@ -449,6 +486,44 @@ class ImportReceiptListAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class ImportReceiptAPIView(APIView):
+    def get(self, request, pk):
+        try:
+            # Lấy chi tiết kho theo ID (pk)
+            import_receipt = ImportReceipt.objects.get(pk=pk)
+            serializer = ImportReceiptSerializer(import_receipt)
+
+            # Tạo response JSON
+            response = {
+                "statusCode": status.HTTP_200_OK,
+                "status": "success",
+                "data": serializer.data,
+                "errorMessage": None,
+            }
+            return Response(response, status=status.HTTP_200_OK)
+
+        except ImportReceipt.DoesNotExist:
+            # Trả về lỗi nếu kho không tồn tại
+            response = {
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "status": "error",
+                "data": None,
+                "errorMessage": "Warehouse not found.",
+            }
+            return Response(response, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            # Trả về lỗi cho các trường hợp ngoại lệ khác
+            response = {
+                "statusCode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "data": None,
+                "errorMessage": str(e),
+            }
+            return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class ImportReceiptViewSet(viewsets.ModelViewSet):
     queryset = ImportReceipt.objects.all()
@@ -599,7 +674,7 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
         )
 
 
-class ImportReceiptDetailAPIView(APIView):
+class ImportReceiptDetailListAPIView(APIView):
     """
     API endpoint để xem chi tiết một phiếu nhập.
     """
@@ -621,7 +696,7 @@ class ImportReceiptDetailAPIView(APIView):
         details = ImportReceiptDetail.objects.filter(import_receipt=receipt)
         detail_data = [
             {
-                "medicine_name": detail.medicine.name,
+                "medicine_name": detail.medicine.medicine_name,
                 "quantity": detail.quantity,
                 "price": detail.price,
             }
@@ -647,6 +722,41 @@ class ImportReceiptDetailAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+class ImportReceiptDetailAPIView(APIView):
+    def get(self, request, pk):
+        try:
+            # Lấy chi tiết kho theo ID (pk)
+            import_receipt_detail = ImportReceiptDetail.objects.get(pk=pk)
+            serializer = ImportReceiptDetailSerializer(import_receipt_detail)
+
+            # Tạo response JSON
+            response = {
+                "statusCode": status.HTTP_200_OK,
+                "status": "success",
+                "data": serializer.data,
+                "errorMessage": None,
+            }
+            return Response(response, status=status.HTTP_200_OK)
+
+        except ImportReceiptDetail.DoesNotExist:
+            # Trả về lỗi nếu kho không tồn tại
+            response = {
+                "statusCode": status.HTTP_404_NOT_FOUND,
+                "status": "error",
+                "data": None,
+                "errorMessage": "Warehouse not found.",
+            }
+            return Response(response, status=status.HTTP_404_NOT_FOUND)
+
+        except Exception as e:
+            # Trả về lỗi cho các trường hợp ngoại lệ khác
+            response = {
+                "statusCode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "data": None,
+                "errorMessage": str(e),
+            }
+            return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ImportReceiptDetailViewSet(viewsets.ModelViewSet):

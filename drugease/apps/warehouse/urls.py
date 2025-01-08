@@ -10,16 +10,31 @@ router.register(r"import-receipt-details", ImportReceiptDetailViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("medicines/", MedicineListView.as_view(), name="medicine-list"),
-    path("warehouses/", WarehouseListAPIView.as_view(), name="warehouse-list"),
+    path("medicine-list/", MedicineListView.as_view(), name="medicine-list"),
+    path("warehouse-list/", WarehouseListAPIView.as_view(), name="warehouse-list"),
     path(
-        "import-receipts/",
+        "warehouse-list/<int:pk>/",
+        WarehouseDetailAPIView.as_view(),
+        name="warehouse-detail",
+    ),
+    path(
+        "import-receipt-list/",
         ImportReceiptListAPIView.as_view(),
         name="import-receipts-list",
     ),
     path(
-        "import-receipt-details/<int:pk>/",
+        "import-receipt-list/<int:pk>/",
+        ImportReceiptAPIView.as_view(),
+        name="ir-list-id",
+    ),
+    path(
+        "import-receipt-detail-list/",
+        ImportReceiptDetailListAPIView.as_view(),
+        name="ir-detail-list-id",
+    ),
+    path(
+        "import-receipt-detail-list/<int:pk>/",
         ImportReceiptDetailAPIView.as_view(),
-        name="import-receipt-details-list",
+        name="ir-detail-list-id",
     ),
 ]
