@@ -18,15 +18,14 @@ class MedicineListView(APIView):
                 "unit": medicine.unit,
                 "sale_price": medicine.sale_price,
                 "description": medicine.description,
-                "stock_quantity": medicine.stock_quantity,
-                "employee_id": medicine.employee.id,
+                "stock_quantity": medicine.stock_quantity
             }
             for medicine in medicines
         ]
         return Response(
             {
                 "statuscode": status.HTTP_200_OK,
-                "data": None,
+                "data": data,
                 "status": "success",
                 "errorMessage": None,
             },
