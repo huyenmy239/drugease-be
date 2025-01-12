@@ -35,7 +35,7 @@ class MedicineSerializer(serializers.ModelSerializer):
 
 class PrescriptionDetailSerializer(serializers.ModelSerializer):
     medicine = serializers.PrimaryKeyRelatedField(queryset=Medicine.objects.all())  # Cho phép gửi ID khi POST
-    medicine_name = serializers.ReadOnlyField(source='medicine.medicine_name') 
+    medicine_name = serializers.ReadOnlyField(source='medicine.medicine_name')
 
     class Meta:
         model = PrescriptionDetail

@@ -20,6 +20,7 @@ class Medicine(models.Model):
     sale_price = models.FloatField(null=False)
     description = models.CharField(max_length=200, null=True, blank=True)
     stock_quantity = models.IntegerField(default=0)
+    image = models.ImageField(upload_to="medicine_images/", blank=True, null=True)
 
     class Meta:
         db_table = "medicine"

@@ -28,13 +28,23 @@ urlpatterns = [
         name="ir-list-id",
     ),
     path(
-        "import-receipt-detail-list/",
-        ImportReceiptDetailListAPIView.as_view(),
-        name="ir-detail-list-id",
+        "import-receipt-details-by-id/<int:pk>/",
+        ImportReceiptDetailsByIdAPIView.as_view(),
+        name="ir-detail-list",
+    ),
+    # path(
+    #     "import-receipt-detail-list/<int:pk>/",
+    #     ImportReceiptDetailAPIView.as_view(),
+    #     name="ir-detail-list-id",
+    # ),
+    path(
+        "import-receipt-and-detail/",
+        ImportReceiptCreateView.as_view(),
+        name="ir-and-detail2",
     ),
     path(
-        "import-receipt-detail-list/<int:pk>/",
-        ImportReceiptDetailAPIView.as_view(),
-        name="ir-detail-list-id",
+        "ir-create/",
+        ImportReceiptCreateView.as_view(),
+        name="import_receipt_create",
     ),
 ]

@@ -7,8 +7,11 @@ from .models import (
     ExportReceipt,
     ExportReceiptDetail,
 )
+from apps.accounts.models import Employee
+
 from rest_framework.response import Response
 from rest_framework import status
+from django.db import transaction
 
 
 def check_not_empty(value, field_name):
@@ -125,3 +128,32 @@ class ImportReceiptDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = ImportReceiptDetail
         fields = "__all__"  # Hoặc chọn các trường bạn muốn trả về
+
+
+class IRDetailSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ImportReceiptDetail
+        fields = [
+            "medicine",
+            "quantity",
+            "price",
+        ]  # Hoặc chọn các trường bạn muốn trả về
+
+
+class ImportReceiptAndDetailSerializer(serializers.ModelSerializer):
+    details = IRDetailSerializer(many=True)
+
+    class Meta:
+        model = ImportReceipt
+        fields = ["warehouse", "total_amount", "employee", "is_approved", "details"]
+
+    def create(self, validated_data):
+        with transaction.atomic():
+            # Logic tạo phiếu nhập và chi tiết phiếu nhập
+            details_data = validated_data.pop("details")
+            import_receipt = ImportReceipt.objects.create(**validated_data)
+            for detail_data in details_data:
+                ImportReceiptDetail.objects.create(
+                    import_receipt=import_receipt, **detail_data
+                )
+        return import_receipt
