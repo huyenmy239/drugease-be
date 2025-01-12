@@ -7,7 +7,7 @@ class Warehouse(models.Model):
     id = models.AutoField(primary_key=True)
     warehouse_name = models.CharField(max_length=100, null=False)
     address = models.CharField(max_length=200, null=False)
-    is_active = models.BooleanField(default=1)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "warehouse"
@@ -20,7 +20,7 @@ class Medicine(models.Model):
     sale_price = models.FloatField(null=False)
     description = models.CharField(max_length=200, null=True, blank=True)
     stock_quantity = models.IntegerField(default=0)
-    image = models.ImageField(upload_to="medicine_images/", blank=True, null=True)
+    image = models.TextField(blank=True, null=True)
 
     class Meta:
         db_table = "medicine"

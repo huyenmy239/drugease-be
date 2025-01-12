@@ -42,33 +42,33 @@ class MedicineSerializer(serializers.ModelSerializer):
         model = Medicine
         fields = "__all__"
 
-    def check_medicine_name(value):
-        """Kiểm tra tính hợp lệ cho trường 'medicine_name'."""
-        if not value:
-            raise serializers.ValidationError("Tên thuốc không được bỏ trống.")
-        elif len(value) < 3:
-            raise serializers.ValidationError("Tên thuốc phải có ít nhất 3 ký tự.")
-        return value
+    # def check_medicine_name(value):
+    #     """Kiểm tra tính hợp lệ cho trường 'medicine_name'."""
+    #     if not value:
+    #         raise serializers.ValidationError("Tên thuốc không được bỏ trống.")
+    #     elif len(value) < 3:
+    #         raise serializers.ValidationError("Tên thuốc phải có ít nhất 3 ký tự.")
+    #     return value
 
-    def check_sale_price(value):
-        """Kiểm tra tính hợp lệ cho trường 'sale_price'."""
-        if not value:
-            raise serializers.ValidationError("Không được bỏ trống giá thuốc.")
-        elif value <= 0:
-            raise serializers.ValidationError("Giá thuốc phải lớn hơn 0.")
-        return value
+    # def check_sale_price(value):
+    #     """Kiểm tra tính hợp lệ cho trường 'sale_price'."""
+    #     if not value:
+    #         raise serializers.ValidationError("Không được bỏ trống giá thuốc.")
+    #     elif value <= 0:
+    #         raise serializers.ValidationError("Giá thuốc phải lớn hơn 0.")
+    #     return value
 
-    def check_stock_quantity(value):
-        """Kiểm tra tính hợp lệ cho trường 'stock_quantity'."""
-        if value < 0:
-            raise serializers.ValidationError("Số lượng thuốc không thể nhỏ hơn 0.")
-        return value
+    # def check_stock_quantity(value):
+    #     """Kiểm tra tính hợp lệ cho trường 'stock_quantity'."""
+    #     if value < 0:
+    #         raise serializers.ValidationError("Số lượng thuốc không thể nhỏ hơn 0.")
+    #     return value
 
-    def check_unit(value):
-        """Kiểm tra tính hợp lệ cho trường 'unit'."""
-        if not value or value == "":
-            raise serializers.ValidationError("Không được bỏ trống đơn vị tính.")
-        return value
+    # def check_unit(value):
+    #     """Kiểm tra tính hợp lệ cho trường 'unit'."""
+    #     if not value or value == "":
+    #         raise serializers.ValidationError("Không được bỏ trống đơn vị tính.")
+    #     return value
 
 
 class WarehouseSerializer(serializers.ModelSerializer):

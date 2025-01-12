@@ -20,14 +20,8 @@ class MedicineListView(APIView):
     def get(self, request):
         medicines = Medicine.objects.all()
 
-        # In ra toàn bộ danh sách thuốc
-        print("Medicines fetched from DB:", medicines)
-
         data = []
         for medicine in medicines:
-            print(
-                f"Processing medicine: {medicine.medicine_name}"
-            )  # In ra tên thuốc trước khi xử lý
 
             # Kiểm tra xem thuốc có hình ảnh hay không
             if medicine.image:
@@ -58,9 +52,6 @@ class MedicineListView(APIView):
                 }
             )
 
-        # In ra kết quả trước khi trả về Response
-        print("Final data to be returned:", data)
-
         return Response(
             {
                 "statuscode": status.HTTP_200_OK,
@@ -75,7 +66,7 @@ class MedicineListView(APIView):
 class MedicineViewSet(viewsets.ModelViewSet):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
-    parser_classes = (MultiPartParser, FormParser)
+    # parser_classes = (MultiPartParser, FormParser)
 
     def create(self, request, *args, **kwargs):
         try:
@@ -84,8 +75,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
             medicine_name = request.data.get("medicine_name")
             unit = request.data.get("unit")
             sale_price = request.data.get("sale_price")
-            total_amount = request.data.get("stock_quantity")
-            print("request.data", request.data)
+
             if not medicine_name.strip():
                 return Response(
                     {
@@ -107,7 +97,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            if int(sale_price) <= 0:
+            if float(sale_price) <= 0:
                 return Response(
                     {
                         "statuscode": status.HTTP_400_BAD_REQUEST,
@@ -117,17 +107,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            print("total_amount", type(total_amount))
-            if int(total_amount) <= 0:
-                return Response(
-                    {
-                        "statuscode": status.HTTP_400_BAD_REQUEST,
-                        "data": None,
-                        "status": "error",
-                        "errorMessage": "Số lượng tồn phải lớn hơn 0.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+
             if Medicine.objects.filter(medicine_name=medicine_name).exists():
                 return Response(
                     {
@@ -174,25 +154,23 @@ class MedicineViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         try:
+            # Lấy đối tượng cần cập nhật
             instance = self.get_object()
 
-            serializer = self.get_serializer(instance, data=request.data)
+            # Các trường được phép sửa
+            allowed_fields = ["sale_price", "description", "image"]
 
-            unit = request.data.get("unit", "")
-            sale_price = request.data.get("sale_price", 0)
-            print("request", request.data)
-            if not unit.strip():
-                return Response(
-                    {
-                        "statuscode": status.HTTP_400_BAD_REQUEST,
-                        "data": None,
-                        "status": "error",
-                        "errorMessage": "Không được bỏ trống đơn vị tính.",
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # Lọc dữ liệu gửi đến request và chỉ giữ lại những trường cần cập nhật
+            update_data = {}
+            for field in allowed_fields:
+                if field in request.data:
+                    update_data[field] = request.data[field]
 
-            if sale_price <= 0:
+            # Kiểm tra dữ liệu đầu vào trước khi cập nhật
+            sale_price = request.data.get("sale_price")
+
+            # Kiểm tra giá trị sale_price phải lớn hơn 0
+            if float(sale_price) <= 0:
                 return Response(
                     {
                         "statuscode": status.HTTP_400_BAD_REQUEST,
@@ -203,8 +181,9 @@ class MedicineViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            # Sử dụng serializer để validate và cập nhật dữ liệu
+            serializer = self.get_serializer(instance, data=update_data, partial=True)
             if serializer.is_valid():
-
                 serializer.save()
                 return Response(
                     {
@@ -356,47 +335,49 @@ class WarehouseViewSet(viewsets.ModelViewSet):
     queryset = Warehouse.objects.all()
     serializer_class = WarehouseSerializer
 
-    def get_queryset(self):
-        """
-        Override this method to add search functionality.
-        """
-        queryset = Warehouse.objects.all()
-        search_query = self.request.query_params.get("q", None)
-        if search_query:
-            queryset = queryset.filter(warehouse_name__icontains=search_query)
-        return queryset
+    # def get_queryset(self):
+    #     """
+    #     Override this method to add search functionality.
+    #     """
+    #     queryset = Warehouse.objects.all()
+    #     search_query = self.request.query_params.get("q", None)
+    #     if search_query:
+    #         queryset = queryset.filter(warehouse_name__icontains=search_query)
+    #     return queryset
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
         """
         Tìm kiếm kho theo địa chỉ và trạng thái is_active.
         """
         # Lấy các tham số từ query params
-        address = request.query_params.get('address', None)
-        is_active = request.query_params.get('is_active', None)
+        address = request.query_params.get("address", None)
+        is_active = request.query_params.get("is_active", None)
 
         # Lọc dữ liệu
         warehouses = Warehouse.objects.all()
         if address:
             warehouses = warehouses.filter(address__icontains=address)
         if is_active is not None:
-            warehouses = warehouses.filter(is_active=is_active.lower() == 'true')
+            warehouses = warehouses.filter(is_active=is_active.lower() == "true")
 
         # Serialize dữ liệu
         serializer = WarehouseSerializer(warehouses, many=True)
-        return Response({
-            "statusCode": status.HTTP_200_OK,
-            "status": "success",
-            "data": serializer.data,
-            "errorMessage": None,
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "statusCode": status.HTTP_200_OK,
+                "status": "success",
+                "data": serializer.data,
+                "errorMessage": None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def create(self, request, *args, **kwargs):
         """
         Override the create method to handle custom validation if needed.
         """
         warehouse_name = request.data.get("warehouse_name")
         address = request.data.get("address")
-
-        print("is active", request.data.get("is_active"))
         # Kiểm tra tên kho không được trống
         check_response = check_not_empty(warehouse_name, "tên kho")
         if check_response:
@@ -433,31 +414,29 @@ class WarehouseViewSet(viewsets.ModelViewSet):
             )
 
     def update(self, request, *args, **kwargs):
-        """
-        Override the update method to handle partial or full updates.
-        """
+        # Lấy đối tượng cần cập nhật
         instance = self.get_object()
-        print("instance", instance.is_active)
-        warehouse_name = request.data.get("warehouse_name")
-        address = request.data.get("address")
-        # Kiểm tra tên kho không được trống
-        check_response = check_not_empty(warehouse_name, "tên kho")
-        if check_response:
-            return check_response  # Trả về lỗi nếu không hợp lệ
 
-        # Kiểm tra địa chỉ không được trống
+        # Lấy dữ liệu từ request
+        address = request.data.get("address")
+        is_active = bool(request.data.get("is_active"))
+        print("is_active bool", is_active)
+
         check_response = check_not_empty(address, "địa chỉ kho")
         if check_response:
             return check_response  # Trả về lỗi nếu không hợp lệ
-        check_response = WarehouseSerializer.check_warehouse_name_exists(
-            warehouse_name, current_warehouse=instance
-        )
-        if check_response:
-            return check_response
-        serializer = self.get_serializer(instance, data=request.data)
-        if serializer.is_valid():
-            print("is active", request.data.get("is_active"))
 
+        # Lọc các trường cần cập nhật
+        update_data = {}
+        if address:
+            update_data["address"] = address
+        if is_active is not None:  # Nếu is_active có trong request thì cập nhật
+            update_data["is_active"] = is_active
+
+        # Sử dụng serializer để validate và cập nhật dữ liệu
+        serializer = self.get_serializer(instance, data=update_data, partial=True)
+        if serializer.is_valid():
+            # Lưu và trả về phản hồi thành công
             serializer.save()
             return Response(
                 {
@@ -527,9 +506,6 @@ class ImportReceiptListAPIView(APIView):
 
     def get(self, request):
         import_receipts = ImportReceipt.objects.all()
-        # search_query = request.query_params.get("q", None)
-        # if search_query:
-        #     import_receipts = import_receipts.filter(warehouse__warehouse_name__icontains=search_query)
 
         data = [
             {
@@ -588,7 +564,7 @@ class ImportReceiptAPIView(APIView):
         try:
             # Lấy biên bản nhập kho theo ID (pk)
             import_receipt = ImportReceipt.objects.get(pk=pk)
-            
+
             # Chuẩn bị dữ liệu tùy chỉnh
             receipt_data = {
                 "id": import_receipt.id,
@@ -633,17 +609,17 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
     queryset = ImportReceipt.objects.all()
     serializer_class = ImportReceiptSerializer
 
-    def get_queryset(self):
-        """
-        Tìm kiếm theo tên kho và theo ngày nhập.
-        """
-        queryset = ImportReceipt.objects.all()
-        search_query = self.request.query_params.get("q", None)
-        if search_query:
-            queryset = queryset.filter(
-                warehouse__warehouse_name__icontains=search_query
-            )
-        return queryset
+    # def get_queryset(self):
+    #     """
+    #     Tìm kiếm theo tên kho và theo ngày nhập.
+    #     """
+    #     queryset = ImportReceipt.objects.all()
+    #     search_query = self.request.query_params.get("q", None)
+    #     if search_query:
+    #         queryset = queryset.filter(
+    #             warehouse__warehouse_name__icontains=search_query
+    #         )
+    #     return queryset
 
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
@@ -766,31 +742,21 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """
-        Cập nhật ImportReceipt
+        Cập nhật ImportReceipt (chỉ cho phép cập nhật warehouse và is_approved).
         """
         instance = self.get_object()
-        print("is import_date", instance.import_date)
+
+        # Lấy dữ liệu từ request
         warehouse = request.data.get("warehouse")
-        import_date = request.data.get("import_date")
-        total_amount = request.data.get("total_amount")
-        employee = request.data.get("employee")
+        is_approved = bool(request.data.get("is_approved"))
 
-        # Kiểm tra các trường không trống
-        check_response = check_not_empty(warehouse, "Kho")
-        if check_response:
-            return check_response
+        # Kiểm tra các trường hợp không trống nếu cần
+        if warehouse is not None:
+            check_response = check_not_empty(warehouse, "Kho")
+            if check_response:
+                return check_response
 
-        # check_response = check_not_empty(import_date, "Ngày nhập")
-        # if check_response:
-        #     return check_response
-
-        check_response = check_not_empty(total_amount, "Tổng tiền")
-        if check_response:
-            return check_response
-
-        check_response = check_not_empty(employee, "Nhân viên")
-        if check_response:
-            return check_response
+        # Không cho phép sửa nếu phiếu nhập đã được phê duyệt
         if instance.is_approved:
             return Response(
                 {
@@ -801,7 +767,16 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        serializer = self.get_serializer(instance, data=request.data)
+
+        # Lọc các trường cần cập nhật
+        update_data = {}
+        if warehouse:
+            update_data["warehouse"] = warehouse
+        if is_approved is not None:
+            update_data["is_approved"] = is_approved
+
+        # Sử dụng serializer để validate và cập nhật dữ liệu
+        serializer = self.get_serializer(instance, data=update_data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -813,6 +788,8 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_200_OK,
             )
+
+        # Trả về lỗi nếu không hợp lệ
         return Response(
             {
                 "statuscode": status.HTTP_400_BAD_REQUEST,
@@ -850,55 +827,7 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
         )
 
 
-# class ImportReceiptDetailListAPIView(APIView):
-#     """
-#     API endpoint để xem tất cả chi tiết của các phiếu nhập.
-#     """
-
-#     def get(self, request):
-#         try:
-#             details = ImportReceiptDetail.objects.all()
-#             detail_data = [
-#                 {
-#                     "import_receipt_id": detail.import_receipt.id,
-#                     "medicine_name": detail.medicine.medicine_name,
-#                     "quantity": detail.quantity,
-#                     "price": detail.price,
-#                 }
-#                 for detail in details
-#             ]
-
-#             return Response(
-#                 {
-#                     "statuscode": status.HTTP_200_OK,
-#                     "data": detail_data,
-#                     "status": "success",
-#                     "errorMessage": None,
-#                 },
-#                 status=status.HTTP_200_OK,
-#             )
-#         except ImportReceiptDetail.DoesNotExist:
-#             return Response(
-#                 {
-#                     "statuscode": status.HTTP_404_NOT_FOUND,
-#                     "data": None,
-#                     "status": "error",
-#                     "errorMessage": "Không tìm thấy chi tiết phiếu nhập nào.",
-#                 },
-#                 status=status.HTTP_404_NOT_FOUND,
-#             )
-#         except Exception as e:
-#             return Response(
-#                 {
-#                     "statuscode": status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                     "data": None,
-#                     "status": "error",
-#                     "errorMessage": f"Đã xảy ra lỗi: {str(e)}",
-#                 },
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             )
-
-
+## hàm dùng để lấy chi tiết của một phiếu nhập
 class ImportReceiptDetailsByIdAPIView(APIView):
     """
     API endpoint để xem tất cả chi tiết của các phiếu nhập hoặc chi tiết theo ID phiếu nhập.
@@ -1044,15 +973,15 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
     queryset = ImportReceiptDetail.objects.all()
     serializer_class = ImportReceiptDetailSerializer
 
-    def get_queryset(self):
-        """
-        Tìm kiếm theo mã thuốc hoặc tên thuốc
-        """
-        queryset = ImportReceiptDetail.objects.all()
-        search_query = self.request.query_params.get("q", None)
-        if search_query:
-            queryset = queryset.filter(medicine__name__icontains=search_query)
-        return queryset
+    # def get_queryset(self):
+    #     """
+    #     Tìm kiếm theo mã thuốc hoặc tên thuốc
+    #     """
+    #     queryset = ImportReceiptDetail.objects.all()
+    #     search_query = self.request.query_params.get("q", None)
+    #     if search_query:
+    #         queryset = queryset.filter(medicine__name__icontains=search_query)
+    #     return queryset
 
     def create(self, request, *args, **kwargs):
         """
@@ -1104,35 +1033,48 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """
-        Cập nhật ImportReceiptDetail
+        Cập nhật ImportReceiptDetail (chỉ cho phép cập nhật quantity và price).
         """
+        # Lấy đối tượng cần cập nhật
         instance = self.get_object()
 
-        import_receipt = request.data.get("import_receipt", instance.import_receipt.id)
-        medicine = request.data.get("medicine", instance.medicine.id)
+        # Lấy dữ liệu từ request
         quantity = request.data.get("quantity", instance.quantity)
         price = request.data.get("price", instance.price)
 
         # Kiểm tra các trường không trống
-        check_response = check_not_empty(import_receipt, "Phiếu nhập")
-        if check_response:
-            return check_response
+        if quantity is None:
+            return Response(
+                {
+                    "statuscode": status.HTTP_400_BAD_REQUEST,
+                    "data": None,
+                    "status": "error",
+                    "errorMessage": "Số lượng không được để trống.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        check_response = check_not_empty(medicine, "Thuốc")
-        if check_response:
-            return check_response
+        if price is None:
+            return Response(
+                {
+                    "statuscode": status.HTTP_400_BAD_REQUEST,
+                    "data": None,
+                    "status": "error",
+                    "errorMessage": "Giá không được để trống.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        check_response = check_not_empty(quantity, "Số lượng")
-        if check_response:
-            return check_response
+        # Lọc các trường cần cập nhật
+        update_data = {
+            "quantity": quantity,
+            "price": price,
+        }
 
-        check_response = check_not_empty(price, "Giá")
-        if check_response:
-            return check_response
-
-        # Cập nhật dữ liệu
-        serializer = self.get_serializer(instance, data=request.data)
+        # Sử dụng serializer để validate và cập nhật dữ liệu
+        serializer = self.get_serializer(instance, data=update_data, partial=True)
         if serializer.is_valid():
+            # Lưu và trả về phản hồi thành công
             serializer.save()
             return Response(
                 {
@@ -1143,6 +1085,8 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_200_OK,
             )
+
+        # Trả về lỗi nếu serializer không hợp lệ
         return Response(
             {
                 "statuscode": status.HTTP_400_BAD_REQUEST,
