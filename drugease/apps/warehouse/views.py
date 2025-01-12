@@ -10,6 +10,9 @@ from rest_framework.parsers import MultiPartParser, FormParser
 import base64
 from io import BytesIO
 from PIL import Image
+from django.db.models import Q
+from datetime import datetime
+from rest_framework.decorators import action
 
 
 # view for Medicine
@@ -362,7 +365,30 @@ class WarehouseViewSet(viewsets.ModelViewSet):
         if search_query:
             queryset = queryset.filter(warehouse_name__icontains=search_query)
         return queryset
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        """
+        Tìm kiếm kho theo địa chỉ và trạng thái is_active.
+        """
+        # Lấy các tham số từ query params
+        address = request.query_params.get('address', None)
+        is_active = request.query_params.get('is_active', None)
 
+        # Lọc dữ liệu
+        warehouses = Warehouse.objects.all()
+        if address:
+            warehouses = warehouses.filter(address__icontains=address)
+        if is_active is not None:
+            warehouses = warehouses.filter(is_active=is_active.lower() == 'true')
+
+        # Serialize dữ liệu
+        serializer = WarehouseSerializer(warehouses, many=True)
+        return Response({
+            "statusCode": status.HTTP_200_OK,
+            "status": "success",
+            "data": serializer.data,
+            "errorMessage": None,
+        }, status=status.HTTP_200_OK)
     def create(self, request, *args, **kwargs):
         """
         Override the create method to handle custom validation if needed.
@@ -560,26 +586,35 @@ class ImportReceiptCreateView(CreateAPIView):
 class ImportReceiptAPIView(APIView):
     def get(self, request, pk):
         try:
-            # Lấy chi tiết kho theo ID (pk)
+            # Lấy biên bản nhập kho theo ID (pk)
             import_receipt = ImportReceipt.objects.get(pk=pk)
-            serializer = ImportReceiptSerializer(import_receipt)
+            
+            # Chuẩn bị dữ liệu tùy chỉnh
+            receipt_data = {
+                "id": import_receipt.id,
+                "import_date": import_receipt.import_date.strftime("%d/%m/%Y %H:%M"),
+                "warehouse": import_receipt.warehouse.warehouse_name,  # Tên kho
+                "total_amount": import_receipt.total_amount,  # Tổng giá trị
+                "employee": import_receipt.employee.full_name,  # Tên nhân viên
+                "is_approved": import_receipt.is_approved,  # Trạng thái duyệt
+            }
 
             # Tạo response JSON
             response = {
                 "statusCode": status.HTTP_200_OK,
                 "status": "success",
-                "data": serializer.data,
+                "data": receipt_data,
                 "errorMessage": None,
             }
             return Response(response, status=status.HTTP_200_OK)
 
         except ImportReceipt.DoesNotExist:
-            # Trả về lỗi nếu kho không tồn tại
+            # Trả về lỗi nếu biên bản nhập kho không tồn tại
             response = {
                 "statusCode": status.HTTP_404_NOT_FOUND,
                 "status": "error",
                 "data": None,
-                "errorMessage": "Warehouse not found.",
+                "errorMessage": "Import receipt not found.",
             }
             return Response(response, status=status.HTTP_404_NOT_FOUND)
 
@@ -609,6 +644,77 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
                 warehouse__warehouse_name__icontains=search_query
             )
         return queryset
+
+    @action(detail=False, methods=["get"], url_path="search")
+    def search(self, request):
+        """
+        Custom action to search import receipts by criteria.
+        """
+        try:
+            # Retrieve query parameters
+            start_date = request.query_params.get("start_date")
+            end_date = request.query_params.get("end_date")
+            employee_name = request.query_params.get("employee_name")
+            warehouse_name = request.query_params.get("warehouse_name")
+            is_approved = request.query_params.get("is_approved")
+
+            # Build query
+            query = Q()
+
+            if start_date:
+                start_date_obj = datetime.strptime(start_date, "%Y-%m-%d")
+                query &= Q(import_date__gte=start_date_obj)
+
+            if end_date:
+                end_date_obj = datetime.strptime(end_date, "%Y-%m-%d")
+                query &= Q(import_date__lte=end_date_obj)
+
+            if employee_name:
+                query &= Q(employee__full_name__icontains=employee_name)
+
+            if warehouse_name:
+                query &= Q(warehouse__warehouse_name__icontains=warehouse_name)
+
+            if is_approved is not None:
+                is_approved_bool = is_approved.lower() == "true"
+                query &= Q(is_approved=is_approved_bool)
+
+            # Filter data
+            import_receipts = ImportReceipt.objects.filter(query)
+
+            # Serialize data
+            data = [
+                {
+                    "id": receipt.id,
+                    "import_date": receipt.import_date.strftime("%d/%m/%Y %H:%M"),
+                    "warehouse_name": receipt.warehouse.warehouse_name,
+                    "total_amount": receipt.total_amount,
+                    "employee_name": receipt.employee.full_name,
+                    "is_approved": receipt.is_approved,
+                }
+                for receipt in import_receipts
+            ]
+
+            return Response(
+                {
+                    "statusCode": status.HTTP_200_OK,
+                    "status": "success",
+                    "data": data,
+                    "errorMessage": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {
+                    "statusCode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "status": "error",
+                    "data": None,
+                    "errorMessage": str(e),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     def create(self, request, *args, **kwargs):
         """
