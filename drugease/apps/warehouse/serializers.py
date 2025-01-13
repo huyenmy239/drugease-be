@@ -42,33 +42,33 @@ class MedicineSerializer(serializers.ModelSerializer):
         model = Medicine
         fields = "__all__"
 
-    def check_medicine_name(value):
-        """Kiểm tra tính hợp lệ cho trường 'medicine_name'."""
-        if not value:
-            raise serializers.ValidationError("Tên thuốc không được bỏ trống.")
-        elif len(value) < 3:
-            raise serializers.ValidationError("Tên thuốc phải có ít nhất 3 ký tự.")
-        return value
+    # def check_medicine_name(value):
+    #     """Kiểm tra tính hợp lệ cho trường 'medicine_name'."""
+    #     if not value:
+    #         raise serializers.ValidationError("Tên thuốc không được bỏ trống.")
+    #     elif len(value) < 3:
+    #         raise serializers.ValidationError("Tên thuốc phải có ít nhất 3 ký tự.")
+    #     return value
 
-    def check_sale_price(value):
-        """Kiểm tra tính hợp lệ cho trường 'sale_price'."""
-        if not value:
-            raise serializers.ValidationError("Không được bỏ trống giá thuốc.")
-        elif value <= 0:
-            raise serializers.ValidationError("Giá thuốc phải lớn hơn 0.")
-        return value
+    # def check_sale_price(value):
+    #     """Kiểm tra tính hợp lệ cho trường 'sale_price'."""
+    #     if not value:
+    #         raise serializers.ValidationError("Không được bỏ trống giá thuốc.")
+    #     elif value <= 0:
+    #         raise serializers.ValidationError("Giá thuốc phải lớn hơn 0.")
+    #     return value
 
-    def check_stock_quantity(value):
-        """Kiểm tra tính hợp lệ cho trường 'stock_quantity'."""
-        if value < 0:
-            raise serializers.ValidationError("Số lượng thuốc không thể nhỏ hơn 0.")
-        return value
+    # def check_stock_quantity(value):
+    #     """Kiểm tra tính hợp lệ cho trường 'stock_quantity'."""
+    #     if value < 0:
+    #         raise serializers.ValidationError("Số lượng thuốc không thể nhỏ hơn 0.")
+    #     return value
 
-    def check_unit(value):
-        """Kiểm tra tính hợp lệ cho trường 'unit'."""
-        if not value or value == "":
-            raise serializers.ValidationError("Không được bỏ trống đơn vị tính.")
-        return value
+    # def check_unit(value):
+    #     """Kiểm tra tính hợp lệ cho trường 'unit'."""
+    #     if not value or value == "":
+    #         raise serializers.ValidationError("Không được bỏ trống đơn vị tính.")
+    #     return value
 
 
 class WarehouseSerializer(serializers.ModelSerializer):
@@ -148,12 +148,30 @@ class ImportReceiptAndDetailSerializer(serializers.ModelSerializer):
         fields = ["warehouse", "total_amount", "employee", "is_approved", "details"]
 
     def create(self, validated_data):
-        with transaction.atomic():
-            # Logic tạo phiếu nhập và chi tiết phiếu nhập
-            details_data = validated_data.pop("details")
-            import_receipt = ImportReceipt.objects.create(**validated_data)
-            for detail_data in details_data:
-                ImportReceiptDetail.objects.create(
-                    import_receipt=import_receipt, **detail_data
-                )
+        """
+        Tạo phiếu nhập và chi tiết phiếu nhập trong một giao dịch.
+        """
+        details_data = validated_data.pop(
+            "details"
+        )  # Tách chi tiết phiếu nhập từ validated_data
+        import_receipt = ImportReceipt.objects.create(
+            **validated_data
+        )  # Tạo phiếu nhập
+
+        # Tạo các chi tiết phiếu nhập
+        for detail_data in details_data:
+            ImportReceiptDetail.objects.create(
+                import_receipt=import_receipt, **detail_data
+            )
+
         return import_receipt
+
+    def update_stock_quantity(self, import_receipt):
+        """
+        Cập nhật stock_quantity của medicine khi phiếu nhập được phê duyệt.
+        """
+        if import_receipt.is_approved:
+            for detail in import_receipt.details.all():
+                medicine = detail.medicine
+                medicine.stock_quantity += detail.quantity  # Cộng thêm số lượng vào kho
+                medicine.save()
