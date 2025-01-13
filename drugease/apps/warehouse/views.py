@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+
 from .models import Medicine, ImportReceiptDetail
 from apps.prescriptions.models import PrescriptionDetail
 from rest_framework.views import APIView
@@ -13,6 +15,9 @@ from PIL import Image
 from django.db.models import Q
 from datetime import datetime
 from rest_framework.decorators import action
+from django.db.models import F, Sum
+from django.db import transaction
+from django.shortcuts import get_object_or_404
 
 
 # view for Medicine
@@ -530,33 +535,62 @@ class ImportReceiptListAPIView(APIView):
         )
 
 
-class ImportReceiptCreateView(CreateAPIView):
-    queryset = ImportReceipt.objects.all()
+class ImportReceiptCreateView(APIView):
     serializer_class = ImportReceiptAndDetailSerializer
 
-    def create(self, request, *args, **kwargs):
-        # Xử lý yêu cầu POST để tạo phiếu nhập và chi tiết phiếu nhập
-        serializer = self.get_serializer(data=request.data)
+    def post(self, request, *args, **kwargs):
+        """
+        Xử lý yêu cầu POST để tạo phiếu nhập và chi tiết phiếu nhập,
+        đồng thời cập nhật total_amount cho phiếu nhập.
+        """
+        # Khởi tạo serializer với dữ liệu từ request
+        serializer = self.serializer_class(data=request.data)
         if serializer.is_valid():
-            # Tạo và lưu phiếu nhập và chi tiết phiếu nhập
-            import_receipt = serializer.save()
-            response = {
-                "statusCode": status.HTTP_200_OK,
-                "status": "success",
-                "data": serializer.data,
-                "errorMessage": None,
-            }
-            return Response(response, status=status.HTTP_200_OK)
+            try:
+                with transaction.atomic():  # Đảm bảo mọi thao tác đều thành công trong một giao dịch
+                    import_receipt = (
+                        serializer.save()
+                    )  # Tạo phiếu nhập và chi tiết phiếu nhập
 
-        return Response(
-            {
-                "statuscode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "status": "error",
-                "errorMessage": serializer.errors,
-            },
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+                    # Tính toán total_amount từ các chi tiết
+                    total_amount = 0
+                    for detail in import_receipt.details.all():
+                        total_amount += detail.quantity * detail.price
+
+                    # Cập nhật total_amount cho phiếu nhập
+                    import_receipt.total_amount = total_amount
+                    import_receipt.save()
+                    serializer.update_stock_quantity(import_receipt)
+                    # Trả về phản hồi thành công
+                    return Response(
+                        {
+                            "statusCode": status.HTTP_201_CREATED,
+                            "status": "success",
+                            "data": serializer.data,
+                            "errorMessage": None,
+                        },
+                        status=status.HTTP_201_CREATED,
+                    )
+            except Exception as e:
+                return Response(
+                    {
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "status": "error",
+                        "data": None,
+                        "errorMessage": str(e),
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            return Response(
+                {
+                    "statusCode": status.HTTP_400_BAD_REQUEST,
+                    "status": "error",
+                    "data": None,
+                    "errorMessage": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class ImportReceiptAPIView(APIView):
@@ -608,18 +642,6 @@ class ImportReceiptAPIView(APIView):
 class ImportReceiptViewSet(viewsets.ModelViewSet):
     queryset = ImportReceipt.objects.all()
     serializer_class = ImportReceiptSerializer
-
-    # def get_queryset(self):
-    #     """
-    #     Tìm kiếm theo tên kho và theo ngày nhập.
-    #     """
-    #     queryset = ImportReceipt.objects.all()
-    #     search_query = self.request.query_params.get("q", None)
-    #     if search_query:
-    #         queryset = queryset.filter(
-    #             warehouse__warehouse_name__icontains=search_query
-    #         )
-    #     return queryset
 
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
@@ -694,23 +716,16 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         """
-        Tạo mới ImportReceipt
+        Tạo mới ImportReceipt.
+        Nếu is_approved được duyệt, cập nhật quantity của các Medicine liên quan.
         """
         warehouse = request.data.get("warehouse")
         import_date = request.data.get("import_date")
-        total_amount = request.data.get("total_amount")
+        is_approved = bool(request.data.get("is_approved"))
         employee = request.data.get("employee")
 
         # Kiểm tra các trường không trống
         check_response = check_not_empty(warehouse, "Kho")
-        if check_response:
-            return check_response  # Trả về lỗi nếu không hợp lệ
-
-        # check_response = check_not_empty(import_date, "Ngày nhập")
-        # if check_response:
-        #     return check_response  # Trả về lỗi nếu không hợp lệ
-
-        check_response = check_not_empty(total_amount, "Tổng tiền")
         if check_response:
             return check_response  # Trả về lỗi nếu không hợp lệ
 
@@ -720,16 +735,42 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
-            return Response(
-                {
-                    "statuscode": status.HTTP_201_CREATED,
-                    "data": serializer.data,
-                    "status": "success",
-                    "errorMessage": None,
-                },
-                status=status.HTTP_201_CREATED,
-            )
+            try:
+                # Bắt đầu transaction
+                with transaction.atomic():
+                    # Lưu phiếu nhập
+                    import_receipt = serializer.save()
+
+                    # Nếu phiếu nhập được phê duyệt, cập nhật số lượng thuốc
+                    if is_approved:
+                        details = ImportReceiptDetail.objects.filter(
+                            detail=import_receipt
+                        )
+                        for detail in details:
+                            medicine = detail.medicine
+                            medicine.quantity += detail.quantity
+                            medicine.save()  # Nếu không có lỗi sẽ commit toàn bộ
+
+                return Response(
+                    {
+                        "statuscode": status.HTTP_201_CREATED,
+                        "data": serializer.data,
+                        "status": "success",
+                        "errorMessage": None,
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+            except Exception as e:
+                return Response(
+                    {
+                        "statuscode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        "data": None,
+                        "status": "error",
+                        "errorMessage": f"Đã xảy ra lỗi: {str(e)}",
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
         return Response(
             {
                 "statuscode": status.HTTP_400_BAD_REQUEST,
@@ -742,21 +783,13 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """
-        Cập nhật ImportReceipt (chỉ cho phép cập nhật warehouse và is_approved).
+        Cập nhật ImportReceipt.
+        Nếu is_approved được duyệt, cập nhật quantity của các Medicine liên quan.
         """
         instance = self.get_object()
-
-        # Lấy dữ liệu từ request
-        warehouse = request.data.get("warehouse")
         is_approved = bool(request.data.get("is_approved"))
 
-        # Kiểm tra các trường hợp không trống nếu cần
-        if warehouse is not None:
-            check_response = check_not_empty(warehouse, "Kho")
-            if check_response:
-                return check_response
-
-        # Không cho phép sửa nếu phiếu nhập đã được phê duyệt
+        # Không cho phép sửa nếu phiếu nhập đã được phê duyệt trước đó
         if instance.is_approved:
             return Response(
                 {
@@ -768,14 +801,56 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Lọc các trường cần cập nhật
-        update_data = {}
-        if warehouse:
-            update_data["warehouse"] = warehouse
-        if is_approved is not None:
-            update_data["is_approved"] = is_approved
+        # Kiểm tra nếu trạng thái chuyển từ False sang True
+        if not instance.is_approved and is_approved:
+            try:
+                # Bắt đầu transaction
+                with transaction.atomic():
+                    details = ImportReceiptDetail.objects.filter(
+                        import_receipt=instance
+                    )
+                    for detail in details:
+                        medicine = detail.medicine
+                        medicine.stock_quantity += detail.quantity
+                        medicine.save()  # Nếu không có lỗi sẽ commit toàn bộ
 
-        # Sử dụng serializer để validate và cập nhật dữ liệu
+                    # Cập nhật các trường khác
+                    update_data = {
+                        key: value
+                        for key, value in request.data.items()
+                        if value is not None
+                    }
+                    serializer = self.get_serializer(
+                        instance, data=update_data, partial=True
+                    )
+                    if serializer.is_valid():
+                        serializer.save()
+
+                return Response(
+                    {
+                        "statuscode": status.HTTP_200_OK,
+                        "data": serializer.data,
+                        "status": "success",
+                        "errorMessage": None,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            except Exception as e:
+                return Response(
+                    {
+                        "statuscode": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        "data": None,
+                        "status": "error",
+                        "errorMessage": f"Đã xảy ra lỗi: {str(e)}",
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        # Nếu không có thay đổi về is_approved, thực hiện cập nhật thông thường
+        update_data = {
+            key: value for key, value in request.data.items() if value is not None
+        }
         serializer = self.get_serializer(instance, data=update_data, partial=True)
         if serializer.is_valid():
             serializer.save()
@@ -789,7 +864,6 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_200_OK,
             )
 
-        # Trả về lỗi nếu không hợp lệ
         return Response(
             {
                 "statuscode": status.HTTP_400_BAD_REQUEST,
@@ -837,7 +911,7 @@ class ImportReceiptDetailsByIdAPIView(APIView):
         try:
             if pk:
                 # Lấy chi tiết cho phiếu nhập cụ thể
-                details = ImportReceiptDetail.objects.filter(import_receipt__id=pk)
+                details = ImportReceiptDetail.objects.filter(import_receipt=pk)
                 if not details.exists():
                     return Response(
                         {
@@ -855,7 +929,7 @@ class ImportReceiptDetailsByIdAPIView(APIView):
             detail_data = [
                 {
                     "import_receipt": detail.import_receipt.id,
-                    "medicine": detail.medicine.id,
+                    "medicine": detail.medicine.medicine_name,
                     "quantity": detail.quantity,
                     "price": detail.price,
                 }
@@ -885,26 +959,41 @@ class ImportReceiptDetailsByIdAPIView(APIView):
     def put(self, request, pk):
         """
         Cập nhật nhiều chi tiết phiếu nhập cho phiếu nhập cụ thể.
+        Đồng thời cập nhật lại total_amount của phiếu nhập.
         """
+        print("request.data", request.data)
         try:
             receipt = ImportReceipt.objects.get(pk=pk)
             details = request.data.get("details", [])
 
             updated_details = []
+            # Lấy tất cả các chi tiết phiếu nhập hiện có
+            current_details = list(receipt.details.all())
+            current_medicine_ids = [detail.medicine.id for detail in current_details]
+
+            # Tạo danh sách medicine_id từ đầu vào
+            input_medicine_ids = [detail.get("medicine") for detail in details]
+
+            # Xóa các chi tiết không có trong đầu vào
+            for current_detail in current_details:
+                if current_detail.medicine.id not in input_medicine_ids:
+                    current_detail.delete()
+
+            # Cập nhật hoặc tạo mới chi tiết phiếu nhập
             for detail in details:
                 medicine_id = detail.get("medicine")
                 quantity = detail.get("quantity")
                 price = detail.get("price")
 
-                # Get the Medicine instance using medicine_id
+                # Lấy đối tượng Medicine bằng medicine_id
                 medicine_instance = Medicine.objects.get(id=medicine_id)
 
                 try:
-                    # Try to get the existing ImportReceiptDetail
+                    # Kiểm tra nếu đã tồn tại ImportReceiptDetail
                     import_receipt_detail = ImportReceiptDetail.objects.get(
                         medicine=medicine_instance, import_receipt=receipt
                     )
-                    # If found, update it
+                    # Nếu có, cập nhật giá trị
                     import_receipt_detail.quantity = quantity
                     import_receipt_detail.price = price
                     import_receipt_detail.save()
@@ -912,16 +1001,16 @@ class ImportReceiptDetailsByIdAPIView(APIView):
                     updated_details.append(
                         {
                             "import_receipt": receipt.id,
-                            "medicine": import_receipt_detail.medicine.id,
+                            "medicine": import_receipt_detail.medicine.medicine_name,
                             "quantity": import_receipt_detail.quantity,
                             "price": import_receipt_detail.price,
                         }
                     )
 
                 except ImportReceiptDetail.DoesNotExist:
-                    # If no existing detail found, create a new one
+                    # Nếu không tồn tại, tạo mới chi tiết phiếu nhập
                     import_receipt_detail = ImportReceiptDetail(
-                        medicine=medicine_instance,  # Now passing the Medicine instance
+                        medicine=medicine_instance,
                         import_receipt=receipt,
                         quantity=quantity,
                         price=price,
@@ -931,16 +1020,39 @@ class ImportReceiptDetailsByIdAPIView(APIView):
                     updated_details.append(
                         {
                             "import_receipt": receipt.id,
-                            "medicine": import_receipt_detail.medicine.id,
+                            "medicine": import_receipt_detail.medicine.medicine_name,
                             "quantity": import_receipt_detail.quantity,
                             "price": import_receipt_detail.price,
                         }
                     )
 
+            # Tính lại total_amount của phiếu nhập
+            total_amount = 0
+            for detail in receipt.details.all():
+                total_amount += detail.quantity * detail.price
+
+            # Cập nhật total_amount cho phiếu nhập
+            receipt.total_amount = total_amount
+            receipt.save()
+
+            # Trả về tất cả chi tiết của phiếu nhập sau khi cập nhật
+            all_details = [
+                {
+                    "medicine": detail.medicine.medicine_name,
+                    "quantity": detail.quantity,
+                    "price": detail.price,
+                }
+                for detail in receipt.details.all()
+            ]
+
             return Response(
                 {
                     "statuscode": status.HTTP_200_OK,
-                    "data": updated_details,
+                    "data": {
+                        "import_receipt": receipt.id,
+                        "total_amount": receipt.total_amount,
+                        "all_details": all_details,
+                    },
                     "status": "success",
                     "errorMessage": None,
                 },
@@ -973,45 +1085,31 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
     queryset = ImportReceiptDetail.objects.all()
     serializer_class = ImportReceiptDetailSerializer
 
-    # def get_queryset(self):
-    #     """
-    #     Tìm kiếm theo mã thuốc hoặc tên thuốc
-    #     """
-    #     queryset = ImportReceiptDetail.objects.all()
-    #     search_query = self.request.query_params.get("q", None)
-    #     if search_query:
-    #         queryset = queryset.filter(medicine__name__icontains=search_query)
-    #     return queryset
+    def _recalculate_total_amount(self, import_receipt):
+        """
+        Tính toán lại tổng số tiền (total_amount) của phiếu nhập dựa trên tất cả các chi tiết.
+        """
+        total_amount = sum(
+            detail.quantity * detail.price
+            for detail in ImportReceiptDetail.objects.filter(
+                import_receipt=import_receipt
+            )
+        )
+        import_receipt.total_amount = total_amount
+        import_receipt.save()
 
     def create(self, request, *args, **kwargs):
         """
-        Tạo mới ImportReceiptDetail
+        Tạo mới ImportReceiptDetail và cập nhật total_amount của phiếu nhập.
         """
-        import_receipt = request.data.get("import_receipt")
-        medicine = request.data.get("medicine")
-        quantity = request.data.get("quantity")
-        price = request.data.get("price")
-
-        # Kiểm tra các trường không trống
-        check_response = check_not_empty(import_receipt, "Phiếu nhập")
-        if check_response:
-            return check_response
-
-        check_response = check_not_empty(medicine, "Thuốc")
-        if check_response:
-            return check_response
-
-        check_response = check_not_empty(quantity, "Số lượng")
-        if check_response:
-            return check_response
-
-        check_response = check_not_empty(price, "Giá")
-        if check_response:
-            return check_response
-
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            # Tạo ImportReceiptDetail
+            import_receipt_detail = serializer.save()
+
+            # Tính lại tổng số tiền
+            self._recalculate_total_amount(import_receipt_detail.import_receipt)
+
             return Response(
                 {
                     "statuscode": status.HTTP_201_CREATED,
@@ -1033,16 +1131,25 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """
-        Cập nhật ImportReceiptDetail (chỉ cho phép cập nhật quantity và price).
+        Cập nhật ImportReceiptDetail: chỉ cập nhật medicine, quantity và price.
+        Giá (price) được lấy từ thuộc tính sale_price của thuốc.
         """
-        # Lấy đối tượng cần cập nhật
         instance = self.get_object()
 
-        # Lấy dữ liệu từ request
-        quantity = request.data.get("quantity", instance.quantity)
-        price = request.data.get("price", instance.price)
+        medicine_id = request.data.get("medicine")
+        quantity = request.data.get("quantity")
 
-        # Kiểm tra các trường không trống
+        if not medicine_id:
+            return Response(
+                {
+                    "statuscode": status.HTTP_400_BAD_REQUEST,
+                    "data": None,
+                    "status": "error",
+                    "errorMessage": "Thuốc không được để trống.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         if quantity is None:
             return Response(
                 {
@@ -1054,52 +1161,40 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if price is None:
+        try:
+            medicine = Medicine.objects.get(id=medicine_id)
+        except Medicine.DoesNotExist:
             return Response(
                 {
-                    "statuscode": status.HTTP_400_BAD_REQUEST,
+                    "statuscode": status.HTTP_404_NOT_FOUND,
                     "data": None,
                     "status": "error",
-                    "errorMessage": "Giá không được để trống.",
+                    "errorMessage": "Thuốc không tồn tại.",
                 },
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_404_NOT_FOUND,
             )
 
-        # Lọc các trường cần cập nhật
-        update_data = {
-            "quantity": quantity,
-            "price": price,
-        }
+        instance.medicine = medicine
+        instance.quantity = quantity
+        instance.price = medicine.sale_price
+        instance.save()
 
-        # Sử dụng serializer để validate và cập nhật dữ liệu
-        serializer = self.get_serializer(instance, data=update_data, partial=True)
-        if serializer.is_valid():
-            # Lưu và trả về phản hồi thành công
-            serializer.save()
-            return Response(
-                {
-                    "statuscode": status.HTTP_200_OK,
-                    "data": serializer.data,
-                    "status": "success",
-                    "errorMessage": None,
-                },
-                status=status.HTTP_200_OK,
-            )
+        self._recalculate_total_amount(instance.import_receipt)
 
-        # Trả về lỗi nếu serializer không hợp lệ
+        serializer = self.get_serializer(instance)
         return Response(
             {
-                "statuscode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "status": "error",
-                "errorMessage": serializer.errors,
+                "statuscode": status.HTTP_200_OK,
+                "data": serializer.data,
+                "status": "success",
+                "errorMessage": None,
             },
-            status=status.HTTP_400_BAD_REQUEST,
+            status=status.HTTP_200_OK,
         )
 
     def destroy(self, request, *args, **kwargs):
         """
-        Xóa ImportReceiptDetail, kiểm tra nếu ImportReceipt đã được phê duyệt thì không cho phép xóa.
+        Xóa ImportReceiptDetail và cập nhật total_amount của phiếu nhập.
         """
         instance = self.get_object()
 
@@ -1115,8 +1210,15 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Lưu tham chiếu đến phiếu nhập trước khi xóa
+        import_receipt = instance.import_receipt
+
         # Xóa chi tiết phiếu nhập
         instance.delete()
+
+        # Tính lại tổng số tiền
+        self._recalculate_total_amount(import_receipt)
+
         return Response(
             {
                 "statuscode": status.HTTP_204_NO_CONTENT,

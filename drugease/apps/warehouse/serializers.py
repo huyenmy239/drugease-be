@@ -148,12 +148,30 @@ class ImportReceiptAndDetailSerializer(serializers.ModelSerializer):
         fields = ["warehouse", "total_amount", "employee", "is_approved", "details"]
 
     def create(self, validated_data):
-        with transaction.atomic():
-            # Logic tạo phiếu nhập và chi tiết phiếu nhập
-            details_data = validated_data.pop("details")
-            import_receipt = ImportReceipt.objects.create(**validated_data)
-            for detail_data in details_data:
-                ImportReceiptDetail.objects.create(
-                    import_receipt=import_receipt, **detail_data
-                )
+        """
+        Tạo phiếu nhập và chi tiết phiếu nhập trong một giao dịch.
+        """
+        details_data = validated_data.pop(
+            "details"
+        )  # Tách chi tiết phiếu nhập từ validated_data
+        import_receipt = ImportReceipt.objects.create(
+            **validated_data
+        )  # Tạo phiếu nhập
+
+        # Tạo các chi tiết phiếu nhập
+        for detail_data in details_data:
+            ImportReceiptDetail.objects.create(
+                import_receipt=import_receipt, **detail_data
+            )
+
         return import_receipt
+
+    def update_stock_quantity(self, import_receipt):
+        """
+        Cập nhật stock_quantity của medicine khi phiếu nhập được phê duyệt.
+        """
+        if import_receipt.is_approved:
+            for detail in import_receipt.details.all():
+                medicine = detail.medicine
+                medicine.stock_quantity += detail.quantity  # Cộng thêm số lượng vào kho
+                medicine.save()
