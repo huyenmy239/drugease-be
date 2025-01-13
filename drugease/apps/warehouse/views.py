@@ -332,7 +332,7 @@ from rest_framework.decorators import permission_classes
 #             )
 
 #View for Medicine
-# @permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated])
 class MedicineViewSet(viewsets.ModelViewSet):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
@@ -341,7 +341,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
     def list(self, request):
         medicines = Medicine.objects.all()
         data = [self._serialize_medicine(medicine) for medicine in medicines]
-
+        print(data)
         return Response({
             "statuscode": status.HTTP_200_OK,
             "data": data,
@@ -365,7 +365,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
     def create(self, request, *args, **kwargs):
-        print("Sonmea")
         try:
 
             # Sao chép request.data thành dict để có thể thay đổi
@@ -400,7 +399,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
         except ValueError as e:
             return self._error_response(status.HTTP_400_BAD_REQUEST, str(e))
         except Exception as e:
-            print("daya", request.data)
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
 
