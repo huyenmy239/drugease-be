@@ -341,7 +341,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
     def list(self, request):
         medicines = Medicine.objects.all()
         data = [self._serialize_medicine(medicine) for medicine in medicines]
-        print(data)
         return Response({
             "statuscode": status.HTTP_200_OK,
             "data": data,
