@@ -12,15 +12,17 @@ class DoctorField(serializers.PrimaryKeyRelatedField):
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
-        fields = ['id', 'full_name', 'date_of_birth', 'gender', 'id_card', 'phone_number', 'address', 'email', 'registration_date', 'insurance', 'employee']
 
-    def update(self, instance, validated_data):
-        email = validated_data.get('email', instance.email)
-        phone_number = validated_data.get('phone_number', instance.phone_number)
-        instance.email = email
-        instance.phone_number = phone_number
-        instance.save()
-        return instance
+        fields = ['id', 'full_name', 'date_of_birth', 'gender', 'id_card', 'phone_number', 'address', 'email', 'insurance', 'employee']
+
+    # def update(self, instance, validated_data):
+    #     email = validated_data.get('email', instance.email)
+    #     phone_number = validated_data.get('phone_number', instance.phone_number)
+    #     instance.email = email
+    #     instance.phone_number = phone_number
+    #     instance.save()
+    #     return instance
+
 
 
 class PatientNameSerializer(serializers.ModelSerializer):
@@ -35,7 +37,7 @@ class MedicineSerializer(serializers.ModelSerializer):
 
 class PrescriptionDetailSerializer(serializers.ModelSerializer):
     medicine = serializers.PrimaryKeyRelatedField(queryset=Medicine.objects.all())  # Cho phép gửi ID khi POST
-    medicine_name = serializers.ReadOnlyField(source='medicine.medicine_name') 
+    medicine_name = serializers.ReadOnlyField(source='medicine.medicine_name')
 
     class Meta:
         model = PrescriptionDetail
