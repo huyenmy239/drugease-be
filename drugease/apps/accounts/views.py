@@ -1,4 +1,5 @@
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -7,7 +8,7 @@ from rest_framework import status
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth import authenticate
 from .models import Account, Employee
-from .serializers import AccountSerializer, LoginSerializer
+from .serializers import *
 
 
 class AccountViewSet(ModelViewSet):
@@ -59,3 +60,68 @@ class AccountViewSet(ModelViewSet):
             }, status=status.HTTP_200_OK)
 
         return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class EmployeeList(APIView):
+    def get(self, request):
+        employees = Employee.objects.all()
+        serializer = EmployeeListSerializer(employees, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class EmployeeViewSet(ModelViewSet):
+    queryset = Employee.objects.all()
+    serializer_class = EmployeeSerializer
+
+    def perform_create(self, serializer):
+        serializer.save()
+
+    def update(self, request, *args, **kwargs):
+        employee = self.get_object()
+        allowed_fields = ['phone_number', 'address', 'email', 'image', 'is_active']
+        for field in allowed_fields:
+            if field in request.data:
+                setattr(employee, field, request.data[field])
+        
+        employee.save()
+        serializer = self.get_serializer(employee)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='deactivate')
+    def deactivate(self, request, pk=None):
+        employee = self.get_object()
+        employee.is_active = False
+        employee.save()
+        return Response({'message': 'Employee deactivated successfully'}, status=status.HTTP_200_OK)
+    
+
+class RoleListView(APIView):
+
+    def get(self, request, *args, **kwargs):
+        roles = [{'value': choice[0], 'label': choice[1]} for choice in Account._meta.get_field('role').choices]
+        return Response({'roles': roles})
+
+
+class ChangePasswordView(APIView):
+
+    def post(self, request, pk=None):
+        try:
+            employee = Employee.objects.get(id=pk)
+        except Employee.DoesNotExist:
+            return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = ChangePasswordSerializer(data=request.data)
+        if serializer.is_valid():
+            old_password = serializer.validated_data['old_password']
+            new_password = serializer.validated_data['new_password']
+
+            user = authenticate(username=employee.account.username, password=old_password)
+            if user is None:
+                return Response({'detail': 'Old password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            employee.account.password = make_password(new_password)
+            employee.account.save()
+
+            return Response({'detail': 'Password updated successfully.'}, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
