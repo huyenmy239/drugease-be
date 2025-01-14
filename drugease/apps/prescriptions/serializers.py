@@ -12,6 +12,7 @@ class DoctorField(serializers.PrimaryKeyRelatedField):
 class PatientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Patient
+
         fields = ['id', 'full_name', 'date_of_birth', 'gender', 'id_card', 'phone_number', 'address', 'email', 'insurance', 'employee']
 
     # def update(self, instance, validated_data):
@@ -21,6 +22,7 @@ class PatientSerializer(serializers.ModelSerializer):
     #     instance.phone_number = phone_number
     #     instance.save()
     #     return instance
+
 
 
 class PatientNameSerializer(serializers.ModelSerializer):
