@@ -5,6 +5,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
+from django.db import IntegrityError
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth import authenticate
 from .models import Account, Employee
@@ -74,7 +76,14 @@ class EmployeeViewSet(ModelViewSet):
     serializer_class = EmployeeSerializer
 
     def perform_create(self, serializer):
-        serializer.save()
+        try:
+            serializer.save()
+        except IntegrityError as e:
+            if 'phone_number' in str(e):
+                raise ValidationError({'phone_number': 'Phone number already exists.'})
+            if 'email' in str(e):
+                raise ValidationError({'email': 'Email already exists.'})
+            raise ValidationError({'detail': 'An error occurred while creating the employee.'})
 
     def update(self, request, *args, **kwargs):
         employee = self.get_object()
@@ -83,7 +92,15 @@ class EmployeeViewSet(ModelViewSet):
             if field in request.data:
                 setattr(employee, field, request.data[field])
         
-        employee.save()
+        try:
+            employee.save()
+        except IntegrityError as e:
+            if 'phone_number' in str(e):
+                raise ValidationError({'phone_number': 'Phone number already exists.'})
+            if 'email' in str(e):
+                raise ValidationError({'email': 'Email already exists.'})
+            raise ValidationError({'detail': 'An error occurred while updating the employee.'})
+
         serializer = self.get_serializer(employee)
         return Response(serializer.data)
 
