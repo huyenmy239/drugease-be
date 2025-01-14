@@ -12,6 +12,7 @@ class Employee(models.Model):
     email = models.EmailField(unique=True, null=False)
     image = models.ImageField(upload_to='employee_images/', default='employee_images/default.png')
     is_active = models.BooleanField(default=1)
+    citizen_id = models.CharField(unique=True, max_length=13, null=False)
 
     class Meta:
         db_table = 'employee'

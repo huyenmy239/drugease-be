@@ -83,6 +83,8 @@ class EmployeeViewSet(ModelViewSet):
                 raise ValidationError({'phone_number': 'Phone number already exists.'})
             if 'email' in str(e):
                 raise ValidationError({'email': 'Email already exists.'})
+            if 'citizen_id' in str(e):
+                raise ValidationError({'citizen_id': 'Citizen identification already exists.'})
             raise ValidationError({'detail': 'An error occurred while creating the employee.'})
 
     def update(self, request, *args, **kwargs):
