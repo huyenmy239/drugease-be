@@ -34,11 +34,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = '__all__'
-        read_only_fields = ['id_card', 'is_active']
+        read_only_fields = ['id_card']
 
 
     def create(self, validated_data):
         validated_data['id_card'] = generate_id_card()
+        validated_data['is_active'] = True
         
         role = validated_data.pop('role', 'staff')
 

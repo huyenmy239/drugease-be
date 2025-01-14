@@ -10,7 +10,7 @@ class Employee(models.Model):
     phone_number = models.CharField(unique=True, max_length=12, null=False)
     address = models.CharField(max_length=200, null=False)
     email = models.EmailField(unique=True, null=False)
-    image = models.TextField(null=True, blank=True) # Add default image later
+    image = models.ImageField(upload_to='employee_images/', default='employee_images/default.png')
     is_active = models.BooleanField(default=1)
 
     class Meta:

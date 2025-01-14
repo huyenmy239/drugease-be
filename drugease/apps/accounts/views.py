@@ -78,7 +78,7 @@ class EmployeeViewSet(ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         employee = self.get_object()
-        allowed_fields = ['phone_number', 'address', 'email', 'image']
+        allowed_fields = ['phone_number', 'address', 'email', 'image', 'is_active']
         for field in allowed_fields:
             if field in request.data:
                 setattr(employee, field, request.data[field])
