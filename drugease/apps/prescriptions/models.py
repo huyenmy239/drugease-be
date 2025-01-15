@@ -13,7 +13,6 @@ class Patient(models.Model):
     registration_date = models.DateTimeField(auto_now_add=True)
     insurance = models.FloatField(default=0.0)
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='patients')
-
     class Meta:
         db_table = 'patient'
 
