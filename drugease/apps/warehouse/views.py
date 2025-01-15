@@ -332,7 +332,7 @@ from rest_framework.decorators import permission_classes
 #             )
 
 #View for Medicine
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
 class MedicineViewSet(viewsets.ModelViewSet):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
@@ -341,7 +341,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
     def list(self, request):
         medicines = Medicine.objects.all()
         data = [self._serialize_medicine(medicine) for medicine in medicines]
-        print(data)
         return Response({
             "statuscode": status.HTTP_200_OK,
             "data": data,
@@ -364,15 +363,26 @@ class MedicineViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        query = request.query_params.get('q', '')
+        if query:
+            medicines = Medicine.objects.filter(medicine_name__icontains=query)
+            data = [self._serialize_medicine(medicine) for medicine in medicines]
+            return Response({
+                "statuscode": status.HTTP_200_OK,
+                "data": data,
+                "status": "success",
+                "errorMessage": None,
+            }, status=status.HTTP_200_OK)
+        else:
+            return self._error_response(status.HTTP_400_BAD_REQUEST, "Query parameter 'q' is required.")
+
     def create(self, request, *args, **kwargs):
         try:
 
             # Sao chép request.data thành dict để có thể thay đổi
             data = request.data.copy()
-
-            # Kiểm tra nếu không có giá trị ảnh thì gán giá trị null cho image
-            if 'image' not in data or not data['image']:
-                data['image'] = None
 
 
             # Lấy serializer với dữ liệu đã được cập nhật
@@ -383,7 +393,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
 
             # Kiểm tra xem tên thuốc đã tồn tại hay chưa
             if Medicine.objects.filter(medicine_name=data.get("medicine_name")).exists():
-                return self._error_response(status.HTTP_400_BAD_REQUEST, "Medicine name already exists.")
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Tên thuốc đã tồn tại.")
 
             # Kiểm tra tính hợp lệ của dữ liệu qua serializer
             if serializer.is_valid():
@@ -431,6 +441,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
                 return self._error_response(status.HTTP_400_BAD_REQUEST, "This medicine cannot be deleted as it exists in related records.")
 
             instance.delete()
+            
             return Response({
                 "statuscode": status.HTTP_204_NO_CONTENT,
                 "data": None,
@@ -441,17 +452,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
     def _serialize_medicine(self, medicine):
-        image_data = None
-        if medicine.image:
-            try:
-                img = Image.open(medicine.image.path)
-                buffered = BytesIO()
-                img.save(buffered, format="PNG")
-                img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                image_data = f"data:image/png;base64,{img_str}"
-            except Exception:
-                pass
-
         return {
             "id": medicine.id,
             "medicine_name": medicine.medicine_name,
@@ -459,7 +459,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             "sale_price": medicine.sale_price,
             "description": medicine.description,
             "stock_quantity": medicine.stock_quantity,
-            "image": image_data,
         }
 
     def _validate_medicine_data(self, data):
