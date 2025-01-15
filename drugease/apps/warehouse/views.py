@@ -332,7 +332,7 @@ from rest_framework.decorators import permission_classes
 #             )
 
 #View for Medicine
-@permission_classes([IsAuthenticated])
+# @permission_classes([IsAuthenticated])
 class MedicineViewSet(viewsets.ModelViewSet):
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
@@ -363,6 +363,21 @@ class MedicineViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        query = request.query_params.get('q', '')
+        if query:
+            medicines = Medicine.objects.filter(medicine_name__icontains=query)
+            data = [self._serialize_medicine(medicine) for medicine in medicines]
+            return Response({
+                "statuscode": status.HTTP_200_OK,
+                "data": data,
+                "status": "success",
+                "errorMessage": None,
+            }, status=status.HTTP_200_OK)
+        else:
+            return self._error_response(status.HTTP_400_BAD_REQUEST, "Query parameter 'q' is required.")
+
     def create(self, request, *args, **kwargs):
         try:
 
@@ -373,7 +388,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             if 'image' not in data or not data['image']:
                 data['image'] = None
 
-
             # Lấy serializer với dữ liệu đã được cập nhật
             serializer = self.get_serializer(data=data)
 
@@ -382,7 +396,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
 
             # Kiểm tra xem tên thuốc đã tồn tại hay chưa
             if Medicine.objects.filter(medicine_name=data.get("medicine_name")).exists():
-                return self._error_response(status.HTTP_400_BAD_REQUEST, "Medicine name already exists.")
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Tên thuốc đã tồn tại.")
 
             # Kiểm tra tính hợp lệ của dữ liệu qua serializer
             if serializer.is_valid():
@@ -430,6 +444,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
                 return self._error_response(status.HTTP_400_BAD_REQUEST, "This medicine cannot be deleted as it exists in related records.")
 
             instance.delete()
+            
             return Response({
                 "statuscode": status.HTTP_204_NO_CONTENT,
                 "data": None,
