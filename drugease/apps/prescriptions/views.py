@@ -1,3 +1,4 @@
+import datetime
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -288,11 +289,120 @@ class MedicineListView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
+# class PrescriptionViewSet(viewsets.ModelViewSet):
+#     queryset = Prescription.objects.all()
+#     serializer_class = PrescriptionSerializer
+#     # permission_classes = [IsAuthenticated]
+
+#     def get_queryset(self):
+#         queryset = super().get_queryset()
+#         doctor_id = self.request.query_params.get("doctor", None)
+
+#         if doctor_id is not None:
+#             queryset = queryset.filter(doctor_id=doctor_id)
+
+#         return queryset
+
+#     def retrieve(self, request, *args, **kwargs):
+#         prescription = self.get_object()
+
+#         # Serializing Prescription (tùy vào bạn muốn kiểu dữ liệu nào)
+#         serializer = PrescriptionViewSerializer(prescription)
+
+#         # Trả về dữ liệu Prescription dưới dạng JSON
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+    
+#     def create(self, request, *args, **kwargs):
+#         serializer = self.get_serializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         prescription = serializer.save()
+
+#         details_data = request.data.get("details", [])
+
+#         for detail_data in details_data:
+#             detail_data["prescription"] = prescription.id
+#             detail_serializer = PrescriptionDetailSerializer(data=detail_data)
+#             detail_serializer.is_valid(raise_exception=True)
+#             detail_serializer.save()
+
+#         return Response(
+#             PrescriptionSerializer(prescription).data, status=status.HTTP_201_CREATED
+#         )
+
+#     def update(self, request, *args, **kwargs):
+#         instance = self.get_object()
+#         if hasattr(instance, "export_receipts"):
+#             raise ValidationError(
+#                 "Cannot update a prescription that has an associated export receipt."
+#             )
+
+#         partial = kwargs.pop("partial", False)
+#         serializer = self.get_serializer(instance, data=request.data, partial=partial)
+#         serializer.is_valid(raise_exception=True)
+#         prescription = serializer.save()
+
+#         details_data = request.data.get("details", [])
+#         existing_detail_ids = {
+#             detail.get("id") for detail in details_data if "id" in detail
+#         }
+
+#         PrescriptionDetail.objects.filter(prescription=prescription).exclude(
+#             id__in=existing_detail_ids
+#         ).delete()
+
+#         for detail_data in details_data:
+#             if "id" in detail_data:
+#                 detail_instance = PrescriptionDetail.objects.get(
+#                     id=detail_data["id"], prescription=prescription
+#                 )
+#                 detail_serializer = PrescriptionDetailSerializer(
+#                     detail_instance, data=detail_data, partial=partial
+#                 )
+#                 detail_serializer.is_valid(raise_exception=True)
+#                 detail_serializer.save()
+#             else:
+#                 detail_data["prescription"] = prescription.id
+#                 detail_serializer = PrescriptionDetailSerializer(data=detail_data)
+#                 detail_serializer.is_valid(raise_exception=True)
+#                 detail_serializer.save()
+
+#         return Response(PrescriptionSerializer(prescription).data)
+
+#     def destroy(self, request, *args, **kwargs):
+#         instance = self.get_object()
+
+#         if hasattr(instance, "export_receipts"):
+#             raise ValidationError(
+#                 "Cannot delete a prescription that has an associated export receipt."
+#             )
+
+#         return super().destroy(request, *args, **kwargs)
+
+
+# class PrescriptionListView(APIView):
+
+    # def get(self, request):
+    #     doctor_id = request.query_params.get("doctor", None)
+
+    #     if doctor_id:
+    #         prescriptions = Prescription.objects.filter(doctor=doctor_id).order_by(
+    #             "-prescription_date"
+    #         )
+    #     else:
+    #         prescriptions = Prescription.objects.all().order_by("-prescription_date")
+    #     serializer = PrescriptionViewSerializer(prescriptions, many=True)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
+
 class PrescriptionViewSet(viewsets.ModelViewSet):
     queryset = Prescription.objects.all()
-    serializer_class = PrescriptionSerializer
-    # permission_classes = [IsAuthenticated]
+    def get_serializer_class(self):
+        # Nếu là phương thức POST (create), sử dụng serializer tạo mới
+        if self.action == 'create':
+            return PrescriptionCreateSerializer
+        # Nếu không phải là POST (get, update, delete), sử dụng serializer xem
+        return PrescriptionViewSerializer
 
+    #Lọc theo mã bác sĩ
     def get_queryset(self):
         queryset = super().get_queryset()
         doctor_id = self.request.query_params.get("doctor", None)
@@ -302,28 +412,58 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
 
         return queryset
 
+    #Tìm kiếm theo đơn thuốc
+    def retrieve(self, request, *args, **kwargs):
+        prescription = self.get_object()
+
+        # Serialize Prescription
+        serializer = PrescriptionViewSerializer(prescription)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        # Lấy serializer để validate và lưu Prescription
+        serializer = PrescriptionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        # Tạo đơn thuốc và lưu vào database
         prescription = serializer.save()
 
+        # Gán thông tin patient và doctor từ request vào đơn thuốc
+        patient_id = request.data.get("patient")
+        doctor_id = request.data.get("doctor")
+
+        try:
+            patient = Patient.objects.get(id=patient_id)
+        except Patient.DoesNotExist:
+            raise ValidationError({"patient": "Patient with this ID does not exist."})
+
+        try:
+            doctor = Employee.objects.get(id=doctor_id)
+        except Employee.DoesNotExist:
+            raise ValidationError({"doctor": "Doctor with this ID does not exist."})
+
+        prescription.save()
+
+        # Sau khi tạo Prescription, ta lưu các chi tiết đơn thuốc vào PrescriptionDetail
         details_data = request.data.get("details", [])
+
         for detail_data in details_data:
-            detail_data["prescription"] = prescription.id
+            detail_data["prescription"] = prescription.id  # Gán Prescription vào mỗi detail
             detail_serializer = PrescriptionDetailSerializer(data=detail_data)
             detail_serializer.is_valid(raise_exception=True)
             detail_serializer.save()
 
+        # Trả về response với đơn thuốc vừa tạo
         return Response(
-            PrescriptionSerializer(prescription).data, status=status.HTTP_201_CREATED
+            PrescriptionViewSerializer(prescription).data, status=status.HTTP_201_CREATED
         )
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
+
         if hasattr(instance, "export_receipts"):
-            raise ValidationError(
-                "Cannot update a prescription that has an associated export receipt."
-            )
+            raise ValidationError("Cannot update a prescription that has an associated export receipt.")
 
         partial = kwargs.pop("partial", False)
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -331,22 +471,16 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
         prescription = serializer.save()
 
         details_data = request.data.get("details", [])
-        existing_detail_ids = {
-            detail.get("id") for detail in details_data if "id" in detail
-        }
+        existing_detail_ids = {detail.get("id") for detail in details_data if "id" in detail}
 
-        PrescriptionDetail.objects.filter(prescription=prescription).exclude(
-            id__in=existing_detail_ids
-        ).delete()
+        # Delete details that are no longer in the request
+        PrescriptionDetail.objects.filter(prescription=prescription).exclude(id__in=existing_detail_ids).delete()
 
+        # Update or create prescription details
         for detail_data in details_data:
             if "id" in detail_data:
-                detail_instance = PrescriptionDetail.objects.get(
-                    id=detail_data["id"], prescription=prescription
-                )
-                detail_serializer = PrescriptionDetailSerializer(
-                    detail_instance, data=detail_data, partial=partial
-                )
+                detail_instance = PrescriptionDetail.objects.get(id=detail_data["id"], prescription=prescription)
+                detail_serializer = PrescriptionDetailSerializer(detail_instance, data=detail_data, partial=partial)
                 detail_serializer.is_valid(raise_exception=True)
                 detail_serializer.save()
             else:
@@ -355,28 +489,12 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
                 detail_serializer.is_valid(raise_exception=True)
                 detail_serializer.save()
 
-        return Response(PrescriptionSerializer(prescription).data)
+        return Response(PrescriptionViewSerializer(prescription).data)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
 
         if hasattr(instance, "export_receipts"):
-            raise ValidationError(
-                "Cannot delete a prescription that has an associated export receipt."
-            )
+            raise ValidationError("Cannot delete a prescription that has an associated export receipt.")
 
         return super().destroy(request, *args, **kwargs)
-
-
-class PrescriptionListView(APIView):
-    def get(self, request):
-        doctor_id = request.query_params.get("doctor", None)
-
-        if doctor_id:
-            prescriptions = Prescription.objects.filter(doctor=doctor_id).order_by(
-                "-prescription_date"
-            )
-        else:
-            prescriptions = Prescription.objects.all().order_by("-prescription_date")
-        serializer = PrescriptionViewSerializer(prescriptions, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)

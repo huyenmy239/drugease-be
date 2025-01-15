@@ -8,9 +8,9 @@ router.register(r"prescriptions", PrescriptionViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),
-    path(
-        "prescription-list/", PrescriptionListView.as_view(), name="prescription-list"
-    ),
+    # path(
+    #     "prescription-list/", PrescriptionListView.as_view(), name="prescription-list"
+    # ),
     path("patient-list/", PatientListView.as_view(), name="patient-list"),
     path(
         "patient-list/<int:pk>/", PatientDetailView.as_view(), name="patient-list-byid"

@@ -1,3 +1,4 @@
+from datetime import datetime
 from rest_framework import serializers
 from .models import Patient, Prescription, PrescriptionDetail
 from apps.accounts.models import Employee
@@ -58,6 +59,37 @@ class PrescriptionViewSerializer(serializers.ModelSerializer):
         model = Prescription
         fields = ['id', 'patient', 'doctor', 'diagnosis', 'prescription_date', 'instruction', 'details']
 
+class PrescriptionDetailPostSerializer(serializers.ModelSerializer):
+    medicine = serializers.PrimaryKeyRelatedField(queryset=Medicine.objects.all())
+    quantity = serializers.IntegerField()
+    usage_instruction = serializers.CharField()
+
+    class Meta:
+        model = PrescriptionDetail
+        fields = ['medicine', 'quantity', 'usage_instruction']
+
+class PrescriptionCreateSerializer(serializers.ModelSerializer):
+    patient = serializers.PrimaryKeyRelatedField(queryset=Patient.objects.all())
+    doctor = serializers.PrimaryKeyRelatedField(queryset=Employee.objects.all())
+    diagnosis = serializers.CharField()
+    prescription_date = serializers.DateField(required=False)
+    details = PrescriptionDetailPostSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Prescription
+        fields = ['id', 'patient', 'doctor', 'diagnosis', 'prescription_date', 'instruction', 'details']
+
+    def create(self, validated_data):
+        # Kiểm tra xem có truyền prescription_date hay không, nếu không, gán giá trị mặc định
+        prescription_date = validated_data.get('prescription_date', datetime.now().date())  # Sử dụng ngày hiện tại nếu không có giá trị
+
+        # Tạo đơn thuốc với các dữ liệu đã validate và thêm prescription_date
+        prescription = Prescription.objects.create(
+            prescription_date=prescription_date,
+            **validated_data
+        )
+        
+        return prescription
 
 class PrescriptionSerializer(serializers.ModelSerializer):
     doctor = DoctorField(queryset=Employee.objects.all())
