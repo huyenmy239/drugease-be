@@ -61,10 +61,7 @@ class EmployeeListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Employee
-        fields = [
-            'id_card', 'full_name', 'phone_number', 'email', 
-            'is_active', 'account', 'role', 'id'
-        ]
+        fields = '__all__'
 
 
 class ChangePasswordSerializer(serializers.Serializer):
