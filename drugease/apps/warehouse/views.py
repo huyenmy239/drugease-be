@@ -22,6 +22,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import permission_classes
 
+import re
+
 
 
 # view for Medicine
@@ -380,10 +382,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         try:
-
-            # Sao chép request.data thành dict để có thể thay đổi
             data = request.data.copy()
-
 
             # Lấy serializer với dữ liệu đã được cập nhật
             serializer = self.get_serializer(data=data)
@@ -411,7 +410,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
-
     def update(self, request, *args, **kwargs):
         try:
             # Lấy đối tượng cần cập nhật
@@ -438,7 +436,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
             instance = self.get_object()
 
             if ImportReceiptDetail.objects.filter(medicine=instance).exists() or PrescriptionDetail.objects.filter(medicine=instance).exists():
-                return self._error_response(status.HTTP_400_BAD_REQUEST, "This medicine cannot be deleted as it exists in related records.")
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Thuốc đã tồn tại trong phiếu nhập (hoặc xuất).")
 
             instance.delete()
             
@@ -464,8 +462,14 @@ class MedicineViewSet(viewsets.ModelViewSet):
     def _validate_medicine_data(self, data):
         if not data.get("medicine_name", "").strip():
             raise ValueError("Medicine name cannot be empty.")
-        if not data.get("unit", "").strip():
+        unit = data.get("unit", "").strip()
+    
+        if not unit:
             raise ValueError("Unit cannot be empty.")
+        
+        # Kiểm tra unit không chứa số hoặc ký tự đặc biệt
+        if not re.match(r"^[a-zA-Z\s]+$", unit):
+            raise ValueError("Unit must not contain numbers or special characters.")
         if int(data.get("sale_price", 0)) <= 0:
             raise ValueError("Sale price must be greater than 0.")
         if int(data.get("stock_quantity", 0)) <= 0:
@@ -478,7 +482,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             "status": "error",
             "errorMessage": error_message,
         }, status=status_code)
-
 
 # view for Warehouse
 class WarehouseListAPIView(APIView):
@@ -711,9 +714,7 @@ class WarehouseViewSet(viewsets.ModelViewSet):
             status=status.HTTP_204_NO_CONTENT,
         )
 
-
 # view for ImportReceipt
-
 
 class ImportReceiptListAPIView(APIView):
     """
