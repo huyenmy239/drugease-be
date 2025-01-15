@@ -384,9 +384,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             # Sao chép request.data thành dict để có thể thay đổi
             data = request.data.copy()
 
-            # Kiểm tra nếu không có giá trị ảnh thì gán giá trị null cho image
-            if 'image' not in data or not data['image']:
-                data['image'] = None
 
             # Lấy serializer với dữ liệu đã được cập nhật
             serializer = self.get_serializer(data=data)
@@ -455,17 +452,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
     def _serialize_medicine(self, medicine):
-        image_data = None
-        if medicine.image:
-            try:
-                img = Image.open(medicine.image.path)
-                buffered = BytesIO()
-                img.save(buffered, format="PNG")
-                img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                image_data = f"data:image/png;base64,{img_str}"
-            except Exception:
-                pass
-
         return {
             "id": medicine.id,
             "medicine_name": medicine.medicine_name,
@@ -473,7 +459,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             "sale_price": medicine.sale_price,
             "description": medicine.description,
             "stock_quantity": medicine.stock_quantity,
-            "image": image_data,
         }
 
     def _validate_medicine_data(self, data):
