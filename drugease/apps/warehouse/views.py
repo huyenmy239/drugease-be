@@ -423,7 +423,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
-
     def update(self, request, *args, **kwargs):
         try:
             instance = self.get_object()
@@ -537,7 +536,6 @@ class WarehouseListAPIView(APIView):
             status=status.HTTP_200_OK,
         )
 
-
 class WarehouseDetailAPIView(APIView):
     def get(self, request, pk):
         try:
@@ -573,7 +571,6 @@ class WarehouseDetailAPIView(APIView):
                 "errorMessage": str(e),
             }
             return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class WarehouseViewSet(viewsets.ModelViewSet):
     queryset = Warehouse.objects.all()

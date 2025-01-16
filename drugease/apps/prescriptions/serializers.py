@@ -4,27 +4,28 @@ from .models import Patient, Prescription, PrescriptionDetail
 from apps.accounts.models import Employee
 from apps.warehouse.models import Medicine
 
-
 class DoctorField(serializers.PrimaryKeyRelatedField):
     def get_queryset(self):
         request = self.context.get('request')
         return Employee.objects.filter(account__role='doctor')
 
 class PatientSerializer(serializers.ModelSerializer):
+    employee = serializers.PrimaryKeyRelatedField(queryset=Employee.objects.all())
+
     class Meta:
         model = Patient
+        fields = ['id', 'full_name', 'date_of_birth', 'gender', 'id_card', 'phone_number', 'address', 'email', 'insurance', 'registration_date', 'employee']
 
-        fields = ['id', 'full_name', 'date_of_birth', 'gender', 'id_card', 'phone_number', 'address', 'email', 'insurance', 'employee']
-
-    # def update(self, instance, validated_data):
-    #     email = validated_data.get('email', instance.email)
-    #     phone_number = validated_data.get('phone_number', instance.phone_number)
-    #     instance.email = email
-    #     instance.phone_number = phone_number
-    #     instance.save()
-    #     return instance
-
-
+    def to_representation(self, instance):
+        """
+        Ghi đè to_representation để định dạng ngày theo dd/mm/yyyy khi trả về dữ liệu.
+        """
+        representation = super().to_representation(instance)
+        
+        if 'registration_date' in representation:
+            representation['registration_date'] = instance.registration_date.strftime('%d/%m/%Y')
+        
+        return representation
 
 class PatientNameSerializer(serializers.ModelSerializer):
     class Meta:
@@ -43,7 +44,6 @@ class PrescriptionDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = PrescriptionDetail
         fields = ['id', 'prescription', 'medicine', 'medicine_name', 'quantity', 'usage_instruction']
-
 
 class DoctorSerializer(serializers.ModelSerializer):
     class Meta:
