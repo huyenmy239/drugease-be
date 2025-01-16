@@ -1,0 +1,22 @@
+from django.urls import path
+from .views import *
+
+urlpatterns = [
+    path('number-of-prescriptions', NumberofPrescriptionsPrescribedReportAPIView.as_view(), name='number-of-prescriptions'),
+    path('med-in-prescription', MedicationsinPrescriptionReportAPIView.as_view(), name='med-in-prescription'),
+    path('medicine-export', MedicineExportReportAPIView.as_view(), name='medicine-export'),
+    path('doctor', DoctorReportAPIView.as_view(), name='doctor'),
+    path('pharmacist', PharmacistReportAPIView.as_view(), name='pharmacist'),
+    path('medicine-revenue', MedicineRevenueReportAPIView.as_view(), name='medicine-revenue'),
+    path("inventory/", ReportInventory.as_view(), name="report-inventory"),
+    path(
+        "import-receipt/",
+        ReportImportReceipt.as_view(),
+        name="report-import-receipt",
+    ),
+    path(
+        "employee-activity/",
+        ReportEmployeeActivity.as_view(),
+        name="report-employee-activity",
+    ),
+]

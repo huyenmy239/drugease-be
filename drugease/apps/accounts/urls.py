@@ -13,5 +13,6 @@ urlpatterns = [
     path('', include(router.urls)),
     path('employees/<int:pk>/change-password/', ChangePasswordView.as_view(), name='change-password'),
     path('employee-list/', EmployeeList.as_view(), name='employee-list'),
+    path('profile/<str:pk>/', EmployeeProfileView.as_view(), name='employee-profile'),
     path('roles/', RoleListView.as_view(), name='role-list'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

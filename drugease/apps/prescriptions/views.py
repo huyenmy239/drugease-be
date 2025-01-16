@@ -49,34 +49,10 @@ from django.db.models import Q
 
 
 class PatientListView(APIView):
-
     def get(self, request):
-        # Lấy tất cả bệnh nhân
         patients = Patient.objects.all()
-
-        # Lặp qua tất cả bệnh nhân và thêm thông tin nhân viên
-        patient_data = []
-        for patient in patients:
-            # Lấy dữ liệu bệnh nhân qua serializer
-            serialized_patient = PatientSerializer(patient).data
-
-            # Thêm thông tin nhân viên vào dữ liệu của bệnh nhân
-            serialized_patient["employee"] = (
-                patient.employee.full_name if patient.employee else None
-            )
-
-            # Thêm vào danh sách kết quả
-            patient_data.append(serialized_patient)
-
-        return Response(
-            {
-                "statusCode": status.HTTP_200_OK,
-                "status": "success",
-                "data": patient_data,  # Trả về dữ liệu đã được thêm thông tin nhân viên
-                "errorMessage": None,
-            },
-            status=status.HTTP_200_OK,
-        )
+        serializer = PatientSerializer(patients, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class PatientDetailView(APIView):
@@ -120,49 +96,56 @@ class PatientDetailView(APIView):
 
 class PatientViewSet(viewsets.ModelViewSet):
     """
-    ViewSet for managing patients
+    ViewSet quản lý bệnh nhân.
     """
-
+    
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
 
-    # Tìm kiếm bệnh nhân (theo tên, số điện thoại, hoặc email)
+    def list(self, request):
+        """
+        Lấy danh sách bệnh nhân.
+        """
+        patients = Patient.objects.all()
+
+        # Sử dụng PatientSerializer để serialize dữ liệu
+        serializer = PatientSerializer(patients, many=True)
+
+        return Response({
+            "statuscode": status.HTTP_200_OK,
+            "data": serializer.data,
+            "status": "success",
+            "errorMessage": None,
+        }, status=status.HTTP_200_OK)
+    
     @action(detail=False, methods=["get"], url_path="search")
     def search(self, request):
-        full_name = request.query_params.get("full_name", None)
-        phone_number = request.query_params.get("phone_number", None)
-        email = request.query_params.get("email", None)
+        full_name = request.query_params.get("full_name", "")
+        phone_number = request.query_params.get("phone_number", "")
+        email = request.query_params.get("email", "")
 
-        filters = Q()
-        if full_name:
-            filters &= Q(full_name__icontains=full_name)
-        if phone_number:
-            filters &= Q(phone_number__icontains=phone_number)
-        if email:
-            filters &= Q(email__icontains=email)
-
-        patients = Patient.objects.filter(filters)
+        patients = Patient.objects.filter(
+            full_name__icontains=full_name,
+            phone_number__icontains=phone_number,
+            email__icontains=email,
+        )
         serializer = PatientSerializer(patients, many=True)
         return Response(
             {
-                "statusCode": 200,
+                "statusCode": status.HTTP_200_OK,
                 "status": "success",
                 "data": serializer.data,
                 "errorMessage": None,
             }
         )
 
-    # Tùy chỉnh phương thức tạo (POST)
     def create(self, request, *args, **kwargs):
         """
         Thêm bệnh nhân mới.
         """
         serializer = self.get_serializer(data=request.data)
-        print("request.data", request.data)
         if serializer.is_valid():
             serializer.save()
-            patient = Patient.objects.get(id=serializer.data["id"]).employee.full_name
-            print("patient", patient)
             return Response(
                 {
                     "statusCode": status.HTTP_201_CREATED,
@@ -172,33 +155,41 @@ class PatientViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_201_CREATED,
             )
-        else:
-            return Response(
-                {
-                    "statusCode": status.HTTP_400_BAD_REQUEST,
-                    "status": "error",
-                    "errorMessage": serializer.errors,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        return Response(
+            {
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "status": "error",
+                "errorMessage": serializer.errors,
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-    # Tùy chỉnh phương thức cập nhật (PUT/PATCH)
     def update(self, request, *args, **kwargs):
         """
         Cập nhật các trường phone_number, address, email, insurance của bệnh nhân.
         """
-        # Lấy bệnh nhân từ DB
         instance = self.get_object()
 
-        # Lọc các trường cần cập nhật
+        # Chỉ cập nhật các trường cần thiết
         update_data = {}
-        allowed_fields = ["phone_number", "address", "email", "insurance"]
-        for field in allowed_fields:
+        for field in ["phone_number", "address", "email", "insurance"]:
             if field in request.data:
                 update_data[field] = request.data[field]
 
-        # Sử dụng serializer để validate và cập nhật dữ liệu
+        if not update_data:
+            return Response(
+                {
+                    "statusCode": status.HTTP_400_BAD_REQUEST,
+                    "data": None,
+                    "status": "error",
+                    "errorMessage": "Chỉ được cập nhật số điện thoại, địa chỉ, email và bảo hiểm.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Sử dụng serializer với partial = True để cập nhật một số trường
         serializer = PatientSerializer(instance, data=update_data, partial=True)
+
         if serializer.is_valid():
             serializer.save()
             return Response(
@@ -210,45 +201,35 @@ class PatientViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_200_OK,
             )
-        else:
-            return Response(
-                {
-                    "statusCode": status.HTTP_400_BAD_REQUEST,
-                    "status": "error",
-                    "errorMessage": serializer.errors,
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-    # Tùy chỉnh phương thức xóa (DELETE)
-    def destroy(self, request, *args, **kwargs):
-        """
-        Xóa bệnh nhân theo ID, kiểm tra nếu bệnh nhân đã có đơn thuốc trước khi xóa.
-        """
-        patient = self.get_object()
-
-        # Kiểm tra nếu bệnh nhân có liên kết với đơn thuốc
-        if Prescription.objects.filter(patient=patient).exists():
-            return Response(
-                {
-                    "statusCode": status.HTTP_400_BAD_REQUEST,
-                    "status": "error",
-                    "errorMessage": "Không thể xóa bệnh nhân đã có đơn thuốc.",
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Nếu không có đơn thuốc, tiến hành xóa bệnh nhân
-        patient.delete()
         return Response(
             {
-                "statusCode": status.HTTP_204_NO_CONTENT,
-                "status": "success",
-                "data": None,
-                "errorMessage": None,
+                "statusCode": status.HTTP_400_BAD_REQUEST,
+                "status": "error",
+                "errorMessage": serializer.errors,
             },
-            status=status.HTTP_204_NO_CONTENT,
+            status=status.HTTP_400_BAD_REQUEST,
         )
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Xóa bệnh nhân.
+        """
+        instance = self.get_object()
+
+        if Prescription.objects.filter(patient=instance).exists():
+            return Response(
+                {
+                    "statusCode": status.HTTP_400_BAD_REQUEST,
+                    "status": "error",
+                    "data": None,
+                    "errorMessage": "Bệnh nhân không thể xóa vì có liên kết với phiếu xuất.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        instance.delete()
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class DoctorListView(APIView):
@@ -281,7 +262,6 @@ class MedicineListView(APIView):
                 "sale_price": medicine.sale_price,
                 "description": medicine.description,
                 "stock_quantity": medicine.stock_quantity,
-                "employee_id": medicine.employee.id,
             }
             for medicine in medicines
         ]

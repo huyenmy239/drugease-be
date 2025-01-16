@@ -64,6 +64,22 @@ class EmployeeListSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 
+class EmployeeProfileSerializer(serializers.ModelSerializer):
+    account = serializers.CharField(source='account.username', read_only=True)
+    role = serializers.CharField(source='account.role', read_only=True)
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Employee
+        fields = '__all__'
+
+    def get_image(self, obj):
+        request = self.context.get('request')
+        if obj.image and hasattr(obj.image, 'url'):
+            return request.build_absolute_uri(obj.image.url)
+        return None
+
+
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField(write_only=True, required=True)
     new_password = serializers.CharField(write_only=True, required=True)

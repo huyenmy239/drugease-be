@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
 
-from .models import Medicine, ImportReceiptDetail
-from apps.prescriptions.models import PrescriptionDetail
+from .models import *
+from apps.prescriptions.models import Prescription, PrescriptionDetail
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
@@ -19,317 +19,11 @@ from django.db.models import F, Sum
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
+import re
+
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import permission_classes
 
-
-
-# view for Medicine
-# @permission_classes([IsAuthenticated])
-# class MedicineListView(APIView):
-#     def get(self, request):
-#         medicines = Medicine.objects.all()
-
-#         # In ra toàn bộ danh sách thuốc
-#         print("Medicines fetched from DB:", medicines)
-
-#         data = []
-#         for medicine in medicines:
-#             print(
-#                 f"Processing medicine: {medicine.medicine_name}"
-#             )  # In ra tên thuốc trước khi xử lý
-
-#             # Kiểm tra xem thuốc có hình ảnh hay không
-#             if medicine.image:
-#                 try:
-#                     print(f"Medicine {medicine.medicine_name} has an image.")
-#                     img = Image.open(medicine.image.path)
-#                     buffered = BytesIO()
-#                     img.save(buffered, format="PNG")
-#                     img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-#                     image_data = f"data:image/png;base64,{img_str}"
-#                 except Exception as e:
-#                     print(f"Error converting image to base64: {e}")
-#                     image_data = None
-#             else:
-#                 print(f"Medicine {medicine.medicine_name} does not have an image.")
-#                 image_data = None
-
-#             # Thêm thông tin thuốc vào danh sách
-#             data.append(
-#                 {
-#                     "id": medicine.id,
-#                     "medicine_name": medicine.medicine_name,
-#                     "unit": medicine.unit,
-#                     "sale_price": medicine.sale_price,
-#                     "description": medicine.description,
-#                     "stock_quantity": medicine.stock_quantity,
-#                     "image": image_data,
-#                 }
-#             )
-
-#         # In ra kết quả trước khi trả về Response
-#         print("Final data to be returned:", data)
-
-#         return Response(
-#             {
-#                 "statuscode": status.HTTP_200_OK,
-#                 "data": data,
-#                 "status": "success",
-#                 "errorMessage": None,
-#             },
-#             status=status.HTTP_200_OK,
-#         )
-
-
-#     def get(self, request, pk):
-#         try:
-#             # Lấy chi tiết kho theo ID (pk)
-#             warehouse = Warehouse.objects.get(pk=pk)
-#             serializer = WarehouseSerializer(warehouse)
-
-#             # Tạo response JSON
-#             response = {
-#                 "statusCode": status.HTTP_200_OK,
-#                 "status": "success",
-#                 "data": serializer.data,
-#                 "errorMessage": None,
-#             }
-#             return Response(response, status=status.HTTP_200_OK)
-
-#         except Warehouse.DoesNotExist:
-#             # Trả về lỗi nếu kho không tồn tại
-#             response = {
-#                 "statusCode": status.HTTP_404_NOT_FOUND,
-#                 "status": "error",
-#                 "data": None,
-#                 "errorMessage": "Warehouse not found.",
-#             }
-#             return Response(response, status=status.HTTP_404_NOT_FOUND)
-
-#         except Exception as e:
-#             # Trả về lỗi cho các trường hợp ngoại lệ khác
-#             response = {
-#                 "statusCode": status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                 "status": "error",
-#                 "data": None,
-#                 "errorMessage": str(e),
-#             }
-#             return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-# class MedicineViewSet(viewsets.ModelViewSet):
-#     queryset = Medicine.objects.all()
-#     serializer_class = MedicineSerializer
-#     parser_classes = (MultiPartParser, FormParser)
-
-#     def create(self, request, *args, **kwargs):
-#         try:
-#             serializer = self.get_serializer(data=request.data)
-
-#             medicine_name = request.data.get("medicine_name")
-#             unit = request.data.get("unit")
-#             sale_price = request.data.get("sale_price")
-#             total_amount = request.data.get("stock_quantity")
-#             print("request.data", request.data)
-#             if not medicine_name.strip():
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Không được bỏ trống tên thuốc.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-#             if not unit.strip():
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Không được bỏ trống đơn vị tính.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-
-#             if int(sale_price) <= 0:
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Giá thuốc phải lớn hơn 0.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-#             print("total_amount", type(total_amount))
-#             if int(total_amount) <= 0:
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Số lượng tồn phải lớn hơn 0.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-#             if Medicine.objects.filter(medicine_name=medicine_name).exists():
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Tên thuốc này đã tồn tại.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-
-#             if serializer.is_valid():
-#                 serializer.save()
-#                 print("serializer.data", serializer.data)
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_201_CREATED,
-#                         "data": serializer.data,
-#                         "status": "success",
-#                         "errorMessage": None,
-#                     },
-#                     status=status.HTTP_201_CREATED,
-#                 )
-#             else:
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": serializer.errors,
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-#         except Exception as e:
-#             return Response(
-#                 {
-#                     "statuscode": status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                     "data": None,
-#                     "status": "error",
-#                     "errorMessage": str(e),
-#                 },
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             )
-
-
-#     def update(self, request, *args, **kwargs):
-#         try:
-#             instance = self.get_object()
-
-#             serializer = self.get_serializer(instance, data=request.data)
-
-#             unit = request.data.get("unit", "")
-#             sale_price = request.data.get("sale_price", 0)
-#             print("request", request.data)
-#             if not unit.strip():
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Không được bỏ trống đơn vị tính.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-
-#             if sale_price <= 0:
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Giá thuốc phải lớn hơn 0.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-
-#             if serializer.is_valid():
-
-#                 serializer.save()
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_200_OK,
-#                         "data": serializer.data,
-#                         "status": "success",
-#                         "errorMessage": None,
-#                     },
-#                     status=status.HTTP_200_OK,
-#                 )
-#             else:
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": serializer.errors,
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-#         except Exception as e:
-#             return Response(
-#                 {
-#                     "statuscode": status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                     "data": None,
-#                     "status": "error",
-#                     "errorMessage": str(e),
-#                 },
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             )
-
-#     def destroy(self, request, *args, **kwargs):
-#         try:
-#             instance = self.get_object()
-
-#             if ImportReceiptDetail.objects.filter(medicine=instance).exists():
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Thuốc này không thể xóa vì đã tồn tại trong phiếu nhập.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-
-#             if PrescriptionDetail.objects.filter(medicine=instance).exists():
-#                 return Response(
-#                     {
-#                         "statuscode": status.HTTP_400_BAD_REQUEST,
-#                         "data": None,
-#                         "status": "error",
-#                         "errorMessage": "Thuốc này không thể xóa vì đã tồn tại trong phiếu xuất.",
-#                     },
-#                     status=status.HTTP_400_BAD_REQUEST,
-#                 )
-
-#             instance.delete()
-#             return Response(
-#                 {
-#                     "statuscode": status.HTTP_204_NO_CONTENT,
-#                     "data": None,
-#                     "status": "success",
-#                     "errorMessage": None,
-#                 },
-#                 status=status.HTTP_204_NO_CONTENT,
-#             )
-
-
-#         except Exception as e:
-#             return Response(
-#                 {
-#                     "statuscode": status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                     "data": None,
-#                     "status": "error",
-#                     "errorMessage": str(e),
-#                 },
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             )
 
 #View for Medicine
 @permission_classes([IsAuthenticated])
@@ -341,7 +35,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
     def list(self, request):
         medicines = Medicine.objects.all()
         data = [self._serialize_medicine(medicine) for medicine in medicines]
-        print(data)
         return Response({
             "statuscode": status.HTTP_200_OK,
             "data": data,
@@ -364,16 +57,24 @@ class MedicineViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        query = request.query_params.get('q', '')
+        if query:
+            medicines = Medicine.objects.filter(medicine_name__icontains=query)
+            data = [self._serialize_medicine(medicine) for medicine in medicines]
+            return Response({
+                "statuscode": status.HTTP_200_OK,
+                "data": data,
+                "status": "success",
+                "errorMessage": None,
+            }, status=status.HTTP_200_OK)
+        else:
+            return self._error_response(status.HTTP_400_BAD_REQUEST, "Query parameter 'q' is required.")
+
     def create(self, request, *args, **kwargs):
         try:
-
-            # Sao chép request.data thành dict để có thể thay đổi
             data = request.data.copy()
-
-            # Kiểm tra nếu không có giá trị ảnh thì gán giá trị null cho image
-            if 'image' not in data or not data['image']:
-                data['image'] = None
-
 
             # Lấy serializer với dữ liệu đã được cập nhật
             serializer = self.get_serializer(data=data)
@@ -381,9 +82,22 @@ class MedicineViewSet(viewsets.ModelViewSet):
             # Validate dữ liệu
             self._validate_medicine_data(data)
 
-            # Kiểm tra xem tên thuốc đã tồn tại hay chưa
-            if Medicine.objects.filter(medicine_name=data.get("medicine_name")).exists():
-                return self._error_response(status.HTTP_400_BAD_REQUEST, "Medicine name already exists.")
+            medicine_name = data.get("medicine_name")
+
+            # Kiểm tra xem tên thuốc đã tồn tại trong bảng Medicine hay chưa
+            if Medicine.objects.filter(medicine_name=medicine_name).exists():
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Tên thuốc đã tồn tại.")
+
+            # Tính tổng số lượng stock_quantity từ import_receipt_detail
+            medicine_code = data.get("medicine_code")  # Giả sử bạn có trường medicine_code trong dữ liệu
+            total_quantity = 0
+            if medicine_code:
+                total_quantity = ImportReceiptDetail.objects.filter(medicine_code=medicine_code).aggregate(
+                    total_quantity=models.Sum('quantity')
+                ).get('total_quantity', 0)  # Nếu không có bản ghi, tổng là 0
+
+            # Cập nhật trường stock_quantity
+            data['stock_quantity'] = total_quantity
 
             # Kiểm tra tính hợp lệ của dữ liệu qua serializer
             if serializer.is_valid():
@@ -401,14 +115,23 @@ class MedicineViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
-
     def update(self, request, *args, **kwargs):
         try:
-            # Lấy đối tượng cần cập nhật
             instance = self.get_object()
 
-            serializer = self.get_serializer(instance, data=request.data)
+            medicine_name = request.data.get("medicine_name")
 
+            if Medicine.objects.filter(medicine_name=medicine_name).exists():
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Tên thuốc đã tồn tại.")
+
+            if ImportReceiptDetail.objects.filter(medicine=instance).exists() or ExportReceiptDetail.objects.filter(medicine=instance).exists():
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Không thể cập nhật thuốc đã tồn tại trong phiếu nhập hoặc phiếu xuất.")
+
+            if "stock_quantity" in request.data:
+                del request.data["stock_quantity"]
+
+             # Sử dụng partial=True để dùng PATCH
+            serializer = self.get_serializer(instance, data=request.data, partial = True)
 
             if serializer.is_valid():
                 serializer.save()
@@ -428,30 +151,15 @@ class MedicineViewSet(viewsets.ModelViewSet):
             instance = self.get_object()
 
             if ImportReceiptDetail.objects.filter(medicine=instance).exists() or PrescriptionDetail.objects.filter(medicine=instance).exists():
-                return self._error_response(status.HTTP_400_BAD_REQUEST, "This medicine cannot be deleted as it exists in related records.")
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Thuốc đã tồn tại trong phiếu nhập (hoặc xuất).")
 
             instance.delete()
-            return Response({
-                "statuscode": status.HTTP_204_NO_CONTENT,
-                "data": None,
-                "status": "success",
-                "errorMessage": None,
-            }, status=status.HTTP_204_NO_CONTENT)
+            
+            return Response(status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
     def _serialize_medicine(self, medicine):
-        image_data = None
-        if medicine.image:
-            try:
-                img = Image.open(medicine.image.path)
-                buffered = BytesIO()
-                img.save(buffered, format="PNG")
-                img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-                image_data = f"data:image/png;base64,{img_str}"
-            except Exception:
-                pass
-
         return {
             "id": medicine.id,
             "medicine_name": medicine.medicine_name,
@@ -459,26 +167,32 @@ class MedicineViewSet(viewsets.ModelViewSet):
             "sale_price": medicine.sale_price,
             "description": medicine.description,
             "stock_quantity": medicine.stock_quantity,
-            "image": image_data,
         }
 
     def _validate_medicine_data(self, data):
         if not data.get("medicine_name", "").strip():
             raise ValueError("Medicine name cannot be empty.")
-        if not data.get("unit", "").strip():
+        unit = data.get("unit", "").strip()
+    
+        if not unit:
             raise ValueError("Unit cannot be empty.")
+        
+        # Kiểm tra unit với tiếng việt hợp lệ
+        if not re.match(r"^[\w\sàáảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+$", unit):
+            raise ValueError("Unit must not contain special characters.")
+
         if int(data.get("sale_price", 0)) <= 0:
             raise ValueError("Sale price must be greater than 0.")
-        if int(data.get("stock_quantity", 0)) <= 0:
-            raise ValueError("Stock quantity must be greater than 0.")
+        # if int(data.get("stock_quantity", 0)) <= 0:
+        #     raise ValueError("Stock quantity must be greater than 0.")
 
     def _error_response(self, status_code, error_message):
-        return Response({
-            "statuscode": status_code,
-            "data": None,
-            "status": "error",
-            "errorMessage": error_message,
-        }, status=status_code)
+	    return Response({
+	            "statuscode": status_code,
+	            "data": None,
+	            "status": "error",
+	            "errorMessage": error_message,
+	        }, status=status_code)
 
 
 # view for Warehouse
@@ -1440,3 +1154,101 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_204_NO_CONTENT,
         )
+
+
+
+# Export
+class WarehouseListView(APIView):
+    def get(self, request):
+        warehouses = Warehouse.objects.filter(is_active = True)
+        data = [
+            {
+                'id': warehouse.id, 
+                'warehouse_name': warehouse.warehouse_name, 
+                'is_active': warehouse.is_active,
+            }
+            for warehouse in warehouses
+        ]
+        return Response(data, status=status.HTTP_200_OK)
+    
+
+class PrescriptionWithoutExportView(APIView):
+    def get(self, request):
+        prescriptions = Prescription.objects.exclude(id__in=ExportReceipt.objects.values('prescription'))
+        serializer = PrescriptionSerializer(prescriptions, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class ExportReceiptListView (APIView):
+    def get(self, request):
+        receipts = ExportReceipt.objects.all().order_by('-export_date')
+        serializer = ExportReceiptViewSerializer(receipts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class ExportReceiptViewSet (viewsets.ModelViewSet):
+    queryset = ExportReceipt.objects.all()
+    serializer_class = ExportReceiptSerializer
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        exportreceipt = serializer.save()
+
+        details_data = request.data.get('details', [])
+        for detail_data in details_data:
+            detail_data['export_receipt'] = exportreceipt.id
+            detail_serializer = ExportReceiptDetailsSerializer(data=detail_data)
+            detail_serializer.is_valid(raise_exception=True)
+            detail_serializer.save()
+
+        return Response(
+            ExportReceiptSerializer(exportreceipt).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_approved:
+            raise ValidationError("Cannot update an export receipt that is already approved.")
+        
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        export_receipt = serializer.save()
+
+        details_data = request.data.get('details', [])
+        existing_detail_ids = {detail.get('id') for detail in details_data if 'id' in detail}
+        
+        ExportReceiptDetail.objects.filter(export_receipt=export_receipt).exclude(id__in=existing_detail_ids).delete()
+
+        for detail_data in details_data:
+            if 'id' in detail_data:
+                detail_instance = ExportReceiptDetail.objects.get(id=detail_data['id'], export_receipt=export_receipt)
+                detail_serializer = ExportReceiptDetailsSerializer(detail_instance, data=detail_data, partial=partial)
+                detail_serializer.is_valid(raise_exception=True)
+                detail_serializer.save()
+            else:
+                detail_data['export_receipt'] = export_receipt.id
+                detail_serializer = ExportReceiptDetailsSerializer(data=detail_data)
+                detail_serializer.is_valid(raise_exception=True)
+                detail_serializer.save()
+
+        
+        return Response(
+            ExportReceiptSerializer(export_receipt).data
+        )
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_approved:
+            raise ValidationError("Cannot update an export receipt that is already approved.")
+
+        return super().destroy(request, *args, **kwargs)
+    
+    @action (detail=True, methods=['get'], url_path='approved')
+    def approved (self, request, pk = None):
+        export = self.get_object()
+        export.is_approved = True
+        export.save()
+        return Response({'message':'Export receipt is approved successfully'}, status=status.HTTP_200_OK)
