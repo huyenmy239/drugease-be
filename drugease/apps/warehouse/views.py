@@ -467,9 +467,10 @@ class MedicineViewSet(viewsets.ModelViewSet):
         if not unit:
             raise ValueError("Unit cannot be empty.")
         
-        # Kiểm tra unit không chứa số hoặc ký tự đặc biệt
-        if not re.match(r"^[a-zA-Z\s]+$", unit):
+        # Kiểm tra unit với tiếng việt hợp lệ
+        if not re.match(r"^[\w\sàáảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+$", unit):
             raise ValueError("Unit must not contain numbers or special characters.")
+
         if int(data.get("sale_price", 0)) <= 0:
             raise ValueError("Sale price must be greater than 0.")
         if int(data.get("stock_quantity", 0)) <= 0:
