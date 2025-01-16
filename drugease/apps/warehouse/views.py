@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 
-from .models import Medicine, ImportReceiptDetail
+from .models import Medicine, ImportReceiptDetail, ExportReceiptDetail
 from apps.prescriptions.models import PrescriptionDetail
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -390,9 +390,22 @@ class MedicineViewSet(viewsets.ModelViewSet):
             # Validate dữ liệu
             self._validate_medicine_data(data)
 
-            # Kiểm tra xem tên thuốc đã tồn tại hay chưa
-            if Medicine.objects.filter(medicine_name=data.get("medicine_name")).exists():
+            medicine_name = data.get("medicine_name")
+
+            # Kiểm tra xem tên thuốc đã tồn tại trong bảng Medicine hay chưa
+            if Medicine.objects.filter(medicine_name=medicine_name).exists():
                 return self._error_response(status.HTTP_400_BAD_REQUEST, "Tên thuốc đã tồn tại.")
+
+            # Tính tổng số lượng stock_quantity từ import_receipt_detail
+            medicine_code = data.get("medicine_code")  # Giả sử bạn có trường medicine_code trong dữ liệu
+            total_quantity = 0
+            if medicine_code:
+                total_quantity = ImportReceiptDetail.objects.filter(medicine_code=medicine_code).aggregate(
+                    total_quantity=models.Sum('quantity')
+                ).get('total_quantity', 0)  # Nếu không có bản ghi, tổng là 0
+
+            # Cập nhật trường stock_quantity
+            data['stock_quantity'] = total_quantity
 
             # Kiểm tra tính hợp lệ của dữ liệu qua serializer
             if serializer.is_valid():
@@ -410,13 +423,24 @@ class MedicineViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return self._error_response(status.HTTP_500_INTERNAL_SERVER_ERROR, str(e))
 
+
     def update(self, request, *args, **kwargs):
         try:
-            # Lấy đối tượng cần cập nhật
             instance = self.get_object()
 
-            serializer = self.get_serializer(instance, data=request.data)
+            medicine_name = request.data.get("medicine_name")
 
+            if Medicine.objects.filter(medicine_name=medicine_name).exists():
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Tên thuốc đã tồn tại.")
+
+            if ImportReceiptDetail.objects.filter(medicine=instance).exists() or ExportReceiptDetail.objects.filter(medicine=instance).exists():
+                return self._error_response(status.HTTP_400_BAD_REQUEST, "Không thể cập nhật thuốc đã tồn tại trong phiếu nhập hoặc phiếu xuất.")
+
+            if "stock_quantity" in request.data:
+                del request.data["stock_quantity"]
+
+             # Sử dụng partial=True để dùng PATCH
+            serializer = self.get_serializer(instance, data=request.data, partial = True)
 
             if serializer.is_valid():
                 serializer.save()
@@ -469,7 +493,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
         
         # Kiểm tra unit với tiếng việt hợp lệ
         if not re.match(r"^[\w\sàáảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+$", unit):
-            raise ValueError("Unit must not contain numbers or special characters.")
+            raise ValueError("Unit must not contain special characters.")
 
         if int(data.get("sale_price", 0)) <= 0:
             raise ValueError("Sale price must be greater than 0.")
