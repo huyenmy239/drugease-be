@@ -18,6 +18,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     """
     ViewSet quản lý bệnh nhân.
     """
+    
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
 
@@ -148,16 +149,7 @@ class PatientViewSet(viewsets.ModelViewSet):
 
         instance.delete()
 
-        return Response(
-            {
-                "statusCode": status.HTTP_204_NO_CONTENT,
-                "status": "success",
-                "data": None,
-                "errorMessage": None,
-            },
-            status=status.HTTP_204_NO_CONTENT,
-        )
-
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class DoctorListView(APIView):
     def get(self, request):

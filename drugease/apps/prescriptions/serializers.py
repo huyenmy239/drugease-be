@@ -24,6 +24,8 @@ class PatientSerializer(serializers.ModelSerializer):
         
         if 'registration_date' in representation:
             representation['registration_date'] = instance.registration_date.strftime('%d/%m/%Y')
+        if 'date_of_birth' in representation:
+            representation['date_of_birth'] = instance.registration_date.strftime('%d/%m/%Y')
         
         return representation
 
