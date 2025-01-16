@@ -12,7 +12,92 @@ from apps.accounts.models import Account
 from apps.warehouse.models import Medicine
 from rest_framework.decorators import action
 from django.db.models import Q
+<<<<<<< HEAD
 from django.shortcuts import get_object_or_404
+=======
+
+# class PatientViewSet(viewsets.ModelViewSet):
+#     queryset = Patient.objects.all()
+#     serializer_class = PatientSerializer
+#     # permission_classes = [IsAuthenticated]
+#     filter_backends = (filters.OrderingFilter, filters.SearchFilter)
+#     search_fields = ['full_name', 'id_card', 'phone_number', 'email']
+#     ordering_fields = '__all__'
+
+#     def get_queryset(self):
+#         queryset = Patient.objects.all()
+
+#         name = self.request.query_params.get('name', None)
+#         birth_year = self.request.query_params.get('birth_year', None)
+#         id_card = self.request.query_params.get('id_card', None)
+#         phone_number = self.request.query_params.get('phone_number', None)
+
+#         if name:
+#             queryset = queryset.filter(full_name__icontains=name)
+#         if birth_year:
+#             queryset = queryset.filter(date_of_birth__year=birth_year)
+#         if id_card:
+#             queryset = queryset.filter(id_card=id_card)
+#         if phone_number:
+#             queryset = queryset.filter(phone_number=phone_number)
+
+#         return queryset
+
+#     def destroy(self, request, *args, **kwargs):
+#         patient = self.get_object()
+
+#         if patient.prescriptions.exists():
+#             raise ValidationError("Cannot delete patient because they have linked prescriptions.")
+
+#         return super().destroy(request, *args, **kwargs)
+
+
+class PatientListView(APIView):
+    def get(self, request):
+        patients = Patient.objects.all()
+        serializer = PatientSerializer(patients, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class PatientDetailView(APIView):
+    """
+    API để lấy chi tiết bệnh nhân theo ID.
+    """
+
+    def get(self, request, pk, *args, **kwargs):
+        try:
+            # Lấy bệnh nhân theo ID
+            patient = Patient.objects.get(pk=pk)
+
+            # Serializer cho bệnh nhân
+            serializer = PatientSerializer(patient)
+
+            # Thêm thông tin nhân viên (nếu có)
+            data = serializer.data
+            data["employee"] = patient.employee.full_name if patient.employee else None
+
+            return Response(
+                {
+                    "statusCode": status.HTTP_200_OK,
+                    "status": "success",
+                    "data": data,
+                    "errorMessage": None,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Patient.DoesNotExist:
+            # Trả về lỗi nếu không tìm thấy bệnh nhân
+            return Response(
+                {
+                    "statusCode": status.HTTP_404_NOT_FOUND,
+                    "status": "error",
+                    "data": None,
+                    "errorMessage": "Patient not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+>>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 
 class PatientViewSet(viewsets.ModelViewSet):
     """
@@ -150,6 +235,10 @@ class PatientViewSet(viewsets.ModelViewSet):
         instance.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+<<<<<<< HEAD
+=======
+
+>>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 
 class DoctorListView(APIView):
     def get(self, request):
@@ -180,7 +269,6 @@ class MedicineListView(APIView):
                 "sale_price": medicine.sale_price,
                 "description": medicine.description,
                 "stock_quantity": medicine.stock_quantity,
-                "employee_id": medicine.employee.id,
             }
             for medicine in medicines
         ]

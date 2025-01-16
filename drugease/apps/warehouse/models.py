@@ -74,6 +74,11 @@ class ExportReceipt(models.Model):
     class Meta:
         db_table = "export_receipt"
 
+    def update_total_amount(self):
+        total_amount = sum(detail.price for detail in self.details.all())
+        self.total_amount = total_amount
+        self.save()
+
 
 class ExportReceiptDetail(models.Model):
     export_receipt = models.ForeignKey(
@@ -91,3 +96,30 @@ class ExportReceiptDetail(models.Model):
     class Meta:
         db_table = "export_receipt_detail"
         unique_together = ("export_receipt", "medicine")
+
+    def save (self, *args, **kwargs):
+        unit_price = float(self.medicine.sale_price)
+        self.price = float(self.quantity) * unit_price
+        
+        prescription = self.export_receipt.prescription
+        patient = prescription.patient
+        
+        insurance = float(patient.insurance)
+        
+        if insurance == 0:
+            self.insurance_covered = False
+        if not self.insurance_covered:
+            self.patient_pay = self.price
+            self.ins_amount = 0
+        else:
+            self.ins_amount = self.price * insurance
+            self.patient_pay = self.price - self.ins_amount
+            
+        super().save(*args, **kwargs)
+        
+        self.export_receipt.update_total_amount()
+        self.export_receipt.save()
+        
+        if self.export_receipt.is_approved:
+            self.medicine.stock_quantity = self.medicine.stock_quantity - self.quantity
+            self.medicine.save() 

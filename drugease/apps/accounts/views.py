@@ -144,3 +144,14 @@ class ChangePasswordView(APIView):
             return Response({'detail': 'Password updated successfully.'}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+class EmployeeProfileView(APIView):
+
+    def get(self, request, pk=None):
+        try:
+            employee = Employee.objects.get(account__username=pk)
+            serializer = EmployeeProfileSerializer(employee, context={'request': request})
+            return Response(serializer.data, status=200)
+        except Employee.DoesNotExist:
+            return Response({'error': 'Profile not found'}, status=404)

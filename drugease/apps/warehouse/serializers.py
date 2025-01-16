@@ -8,6 +8,7 @@ from .models import (
     ExportReceiptDetail,
 )
 from apps.accounts.models import Employee
+from apps.prescriptions.models import Prescription, PrescriptionDetail, Patient
 
 from rest_framework.response import Response
 from rest_framework import status
@@ -175,3 +176,99 @@ class ImportReceiptAndDetailSerializer(serializers.ModelSerializer):
                 medicine = detail.medicine
                 medicine.stock_quantity += detail.quantity  # Cộng thêm số lượng vào kho
                 medicine.save()
+
+
+class StaffSerializer (serializers.ModelSerializer):
+    class Meta:
+        model = Employee
+        fields = ['id', 'full_name']
+
+
+class PatientSerializer (serializers.ModelSerializer):
+    class Meta:
+        model = Patient
+        fields = ['id', 'insurance']
+
+
+class PrescriptionDetailSerializer(serializers.ModelSerializer):
+    medicine = MedicineSerializer()
+
+    class Meta:
+        model = PrescriptionDetail
+        fields = ['id', 'prescription', 'medicine', 'quantity', 'usage_instruction']
+
+
+class PrescriptionSerializer (serializers.ModelSerializer):
+    details = PrescriptionDetailSerializer(many=True, read_only=True)
+    patient = PatientSerializer()
+    class Meta:
+        model = Prescription
+        fields = ['id', 'patient', 'details']
+        
+    def validate(self, data):
+        if hasattr(self.instance, 'export_receipts'):  
+            raise serializers.ValidationError("Đơn thuốc này đã có phiếu xuất liên kết.")
+        return data
+
+
+class ExportReceiptDetailsViewSerializer (serializers.ModelSerializer):
+    medicine = MedicineSerializer()
+    class Meta:
+        model = ExportReceiptDetail
+        fields = ['id', 'export_receipt', 'medicine', 'quantity', 'price', 'insurance_covered', 'ins_amount', 'patient_pay']
+
+
+class ExportReceiptDetailsSerializer (serializers.ModelSerializer):
+    medicine = serializers.PrimaryKeyRelatedField(queryset=Medicine.objects.all())  
+    medicine_name = serializers.ReadOnlyField(source='medicine.medicine_name')
+    class Meta:
+        model = ExportReceiptDetail
+        fields = ['id', 'export_receipt', 'medicine', 'medicine_name','quantity', 'price', 'insurance_covered', 'ins_amount', 'patient_pay']
+
+
+class ExportReceiptViewSerializer (serializers.ModelSerializer):
+    warehouse = WarehouseSerializer()
+    details =ExportReceiptDetailsSerializer(many=True, read_only=True)
+    employee = StaffSerializer()
+    class Meta:
+        model = ExportReceipt
+        fields = ['id', 'prescription', 'warehouse', 'total_amount', 'export_date', 'is_approved', 'employee', 'details']
+        
+    def update(self, instance, validated_data):
+        if 'quantity' in validated_data:
+            old_quantity = instance.quantity
+            new_quantity = validated_data['quantity']
+            
+            if instance.export_receipt.is_approved:
+                medicine = instance.medicine
+                medicine.stock_quantity -= (new_quantity - old_quantity)
+                medicine.save()
+
+        return super().update(instance, validated_data)
+    
+
+class ExportReceiptSerializer (serializers.ModelSerializer):
+    #warehouse = WarehouseSerializer()
+    details =ExportReceiptDetailsSerializer(many=True, read_only=True)
+    #employee = StaffSerializer()
+    #prescription = PrescriptionSerializer()
+    class Meta:
+        model = ExportReceipt
+        fields = ['id', 'prescription', 'warehouse', 'total_amount', 'export_date', 'is_approved', 'employee', 'details']
+        
+    def update(self, instance, validated_data):
+        
+        details_data = validated_data.pop('details', [])
+        instance = super().update(instance, validated_data)
+
+        instance.update_total_amount()
+
+        instance.save()
+
+        return instance
+
+    def to_representation(self, instance):
+        instance.update_total_amount()
+        instance.save()
+
+        return super().to_representation(instance)

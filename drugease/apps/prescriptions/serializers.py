@@ -28,6 +28,19 @@ class PatientSerializer(serializers.ModelSerializer):
             representation['date_of_birth'] = instance.registration_date.strftime('%d/%m/%Y')
         
         return representation
+<<<<<<< HEAD
+=======
+
+    # def update(self, instance, validated_data):
+    #     email = validated_data.get('email', instance.email)
+    #     phone_number = validated_data.get('phone_number', instance.phone_number)
+    #     instance.email = email
+    #     instance.phone_number = phone_number
+    #     instance.save()
+    #     return instance
+
+
+>>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 
 class PatientNameSerializer(serializers.ModelSerializer):
     class Meta:

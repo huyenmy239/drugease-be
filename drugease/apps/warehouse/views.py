@@ -1,8 +1,13 @@
 from rest_framework import serializers
 
 
+<<<<<<< HEAD
 from .models import Medicine, ImportReceiptDetail, ExportReceiptDetail
 from apps.prescriptions.models import PrescriptionDetail
+=======
+from .models import *
+from apps.prescriptions.models import Prescription, PrescriptionDetail
+>>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
@@ -19,10 +24,15 @@ from django.db.models import F, Sum
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 
+import re
+
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import permission_classes
 
+<<<<<<< HEAD
 import re
+=======
+>>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 
 #View for Medicine
 # @permission_classes([IsAuthenticated])
@@ -186,12 +196,12 @@ class MedicineViewSet(viewsets.ModelViewSet):
         #     raise ValueError("Stock quantity must be greater than 0.")
 
     def _error_response(self, status_code, error_message):
-        return Response({
-            "statuscode": status_code,
-            "data": None,
-            "status": "error",
-            "errorMessage": error_message,
-        }, status=status_code)
+	    return Response({
+	            "statuscode": status_code,
+	            "data": None,
+	            "status": "error",
+	            "errorMessage": error_message,
+	        }, status=status_code)
 
 # view for Warehouse
 class WarehouseListAPIView(APIView):
@@ -1148,3 +1158,101 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
             },
             status=status.HTTP_204_NO_CONTENT,
         )
+
+
+
+# Export
+class WarehouseListView(APIView):
+    def get(self, request):
+        warehouses = Warehouse.objects.filter(is_active = True)
+        data = [
+            {
+                'id': warehouse.id, 
+                'warehouse_name': warehouse.warehouse_name, 
+                'is_active': warehouse.is_active,
+            }
+            for warehouse in warehouses
+        ]
+        return Response(data, status=status.HTTP_200_OK)
+    
+
+class PrescriptionWithoutExportView(APIView):
+    def get(self, request):
+        prescriptions = Prescription.objects.exclude(id__in=ExportReceipt.objects.values('prescription'))
+        serializer = PrescriptionSerializer(prescriptions, many=True)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+class ExportReceiptListView (APIView):
+    def get(self, request):
+        receipts = ExportReceipt.objects.all().order_by('-export_date')
+        serializer = ExportReceiptViewSerializer(receipts, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+
+class ExportReceiptViewSet (viewsets.ModelViewSet):
+    queryset = ExportReceipt.objects.all()
+    serializer_class = ExportReceiptSerializer
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        exportreceipt = serializer.save()
+
+        details_data = request.data.get('details', [])
+        for detail_data in details_data:
+            detail_data['export_receipt'] = exportreceipt.id
+            detail_serializer = ExportReceiptDetailsSerializer(data=detail_data)
+            detail_serializer.is_valid(raise_exception=True)
+            detail_serializer.save()
+
+        return Response(
+            ExportReceiptSerializer(exportreceipt).data,
+            status=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_approved:
+            raise ValidationError("Cannot update an export receipt that is already approved.")
+        
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        export_receipt = serializer.save()
+
+        details_data = request.data.get('details', [])
+        existing_detail_ids = {detail.get('id') for detail in details_data if 'id' in detail}
+        
+        ExportReceiptDetail.objects.filter(export_receipt=export_receipt).exclude(id__in=existing_detail_ids).delete()
+
+        for detail_data in details_data:
+            if 'id' in detail_data:
+                detail_instance = ExportReceiptDetail.objects.get(id=detail_data['id'], export_receipt=export_receipt)
+                detail_serializer = ExportReceiptDetailsSerializer(detail_instance, data=detail_data, partial=partial)
+                detail_serializer.is_valid(raise_exception=True)
+                detail_serializer.save()
+            else:
+                detail_data['export_receipt'] = export_receipt.id
+                detail_serializer = ExportReceiptDetailsSerializer(data=detail_data)
+                detail_serializer.is_valid(raise_exception=True)
+                detail_serializer.save()
+
+        
+        return Response(
+            ExportReceiptSerializer(export_receipt).data
+        )
+    
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_approved:
+            raise ValidationError("Cannot update an export receipt that is already approved.")
+
+        return super().destroy(request, *args, **kwargs)
+    
+    @action (detail=True, methods=['get'], url_path='approved')
+    def approved (self, request, pk = None):
+        export = self.get_object()
+        export.is_approved = True
+        export.save()
+        return Response({'message':'Export receipt is approved successfully'}, status=status.HTTP_200_OK)

@@ -7,6 +7,7 @@ router.register(r"medicines", MedicineViewSet)
 router.register(r"warehouses", WarehouseViewSet)
 router.register(r"import-receipts", ImportReceiptViewSet)
 router.register(r"import-receipt-details", ImportReceiptDetailViewSet)
+router.register(r'warehouse', ExportReceiptViewSet)
 
 urlpatterns = [
     path("", include(router.urls)),
@@ -47,4 +48,7 @@ urlpatterns = [
         ImportReceiptCreateView.as_view(),
         name="import_receipt_create",
     ),
+    path('warehouses-list/', WarehouseListView.as_view(), name='warehouses-list'),
+    path('unexportedprescription-list/', PrescriptionWithoutExportView.as_view(), name='unexportedprescription-list'),
+    path('export-list/', ExportReceiptListView.as_view(), name='export-list'),
 ]
