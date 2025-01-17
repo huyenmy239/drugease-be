@@ -1,3 +1,15 @@
+<<<<<<< HEAD
+from datetime import datetime
+from django.db.models import Sum, F
+from jsonschema import ValidationError
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from apps.prescriptions.models import Patient
+from apps.warehouse.models import ImportReceipt, ImportReceiptDetail
+from rest_framework import status
+from rest_framework.views import APIView
+
+=======
 from django.db.models import Count, Min, Max, Sum, Avg, Q, F, ExpressionWrapper, DurationField, FloatField
 from django.db.models.functions import TruncDate, TruncMonth
 from django.utils.timezone import make_aware
@@ -441,6 +453,7 @@ class ReportEmployeeActivity(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         
+>>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 
 class ReportPatient(APIView):
     permission_classes = [IsAuthenticated]
