@@ -14,6 +14,7 @@ from rest_framework import viewsets, status
 from .serializers import *
 from rest_framework.generics import CreateAPIView
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.permissions import IsAuthenticated
 import base64
 from io import BytesIO
 from PIL import Image
@@ -37,6 +38,7 @@ import re
 #View for Medicine
 # @permission_classes([IsAuthenticated])
 class MedicineViewSet(viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     queryset = Medicine.objects.all()
     serializer_class = MedicineSerializer
     # parser_classes = (MultiPartParser, FormParser)
@@ -205,6 +207,7 @@ class MedicineViewSet(viewsets.ModelViewSet):
 
 # view for Warehouse
 class WarehouseListAPIView(APIView):
+    # permission_classes = [IsAuthenticated]
     """
     API endpoint để xem danh sách kho hàng với khả năng tìm kiếm.
     """
@@ -233,6 +236,7 @@ class WarehouseListAPIView(APIView):
         )
 
 class WarehouseDetailAPIView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request, pk):
         try:
             # Lấy chi tiết kho theo ID (pk)
@@ -269,6 +273,7 @@ class WarehouseDetailAPIView(APIView):
             return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class WarehouseViewSet(viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     queryset = Warehouse.objects.all()
     serializer_class = WarehouseSerializer
 
@@ -435,6 +440,7 @@ class WarehouseViewSet(viewsets.ModelViewSet):
 # view for ImportReceipt
 
 class ImportReceiptListAPIView(APIView):
+    # permission_classes = [IsAuthenticated]
     """
     API endpoint để xem danh sách phiếu nhập với khả năng tìm kiếm.
     """
@@ -466,6 +472,7 @@ class ImportReceiptListAPIView(APIView):
 
 
 class ImportReceiptCreateView(APIView):
+    # permission_classes = [IsAuthenticated]
     serializer_class = ImportReceiptAndDetailSerializer
 
     def post(self, request, *args, **kwargs):
@@ -524,6 +531,7 @@ class ImportReceiptCreateView(APIView):
 
 
 class ImportReceiptAPIView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request, pk):
         try:
             # Lấy biên bản nhập kho theo ID (pk)
@@ -570,6 +578,7 @@ class ImportReceiptAPIView(APIView):
 
 
 class ImportReceiptViewSet(viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     queryset = ImportReceipt.objects.all()
     serializer_class = ImportReceiptSerializer
 
@@ -833,6 +842,7 @@ class ImportReceiptViewSet(viewsets.ModelViewSet):
 
 ## hàm dùng để lấy chi tiết của một phiếu nhập
 class ImportReceiptDetailsByIdAPIView(APIView):
+    # permission_classes = [IsAuthenticated]
     """
     API endpoint để xem tất cả chi tiết của các phiếu nhập hoặc chi tiết theo ID phiếu nhập.
     """
@@ -842,16 +852,16 @@ class ImportReceiptDetailsByIdAPIView(APIView):
             if pk:
                 # Lấy chi tiết cho phiếu nhập cụ thể
                 details = ImportReceiptDetail.objects.filter(import_receipt=pk)
-                if not details.exists():
-                    return Response(
-                        {
-                            "statuscode": status.HTTP_404_NOT_FOUND,
-                            "data": None,
-                            "status": "error",
-                            "errorMessage": "Không tìm thấy chi tiết cho phiếu nhập với ID đã cung cấp.",
-                        },
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
+                # if not details.exists():
+                #     return Response(
+                #         {
+                #             "statuscode": status.HTTP_404_NOT_FOUND,
+                #             "data": None,
+                #             "status": "error",
+                #             "errorMessage": "Không tìm thấy chi tiết cho phiếu nhập với ID đã cung cấp.",
+                #         },
+                #         status=status.HTTP_404_NOT_FOUND,
+                #     )
             else:
                 # Lấy tất cả chi tiết
                 details = ImportReceiptDetail.objects.all()
@@ -1012,6 +1022,7 @@ class ImportReceiptDetailsByIdAPIView(APIView):
 
 
 class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     queryset = ImportReceiptDetail.objects.all()
     serializer_class = ImportReceiptDetailSerializer
 
@@ -1163,6 +1174,7 @@ class ImportReceiptDetailViewSet(viewsets.ModelViewSet):
 
 # Export
 class WarehouseListView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         warehouses = Warehouse.objects.filter(is_active = True)
         data = [
@@ -1177,6 +1189,7 @@ class WarehouseListView(APIView):
     
 
 class PrescriptionWithoutExportView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         prescriptions = Prescription.objects.exclude(id__in=ExportReceipt.objects.values('prescription'))
         serializer = PrescriptionSerializer(prescriptions, many=True)
@@ -1184,6 +1197,7 @@ class PrescriptionWithoutExportView(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
 class ExportReceiptListView (APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         receipts = ExportReceipt.objects.all().order_by('-export_date')
         serializer = ExportReceiptViewSerializer(receipts, many=True)
@@ -1191,6 +1205,7 @@ class ExportReceiptListView (APIView):
     
 
 class ExportReceiptViewSet (viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     queryset = ExportReceipt.objects.all()
     serializer_class = ExportReceiptSerializer
     
@@ -1250,9 +1265,3 @@ class ExportReceiptViewSet (viewsets.ModelViewSet):
 
         return super().destroy(request, *args, **kwargs)
     
-    @action (detail=True, methods=['get'], url_path='approved')
-    def approved (self, request, pk = None):
-        export = self.get_object()
-        export.is_approved = True
-        export.save()
-        return Response({'message':'Export receipt is approved successfully'}, status=status.HTTP_200_OK)

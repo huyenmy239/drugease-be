@@ -12,9 +12,7 @@ from apps.accounts.models import Account
 from apps.warehouse.models import Medicine
 from rest_framework.decorators import action
 from django.db.models import Q
-<<<<<<< HEAD
 from django.shortcuts import get_object_or_404
-=======
 
 # class PatientViewSet(viewsets.ModelViewSet):
 #     queryset = Patient.objects.all()
@@ -53,6 +51,7 @@ from django.shortcuts import get_object_or_404
 
 
 class PatientListView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         patients = Patient.objects.all()
         serializer = PatientSerializer(patients, many=True)
@@ -60,6 +59,7 @@ class PatientListView(APIView):
 
 
 class PatientDetailView(APIView):
+    # permission_classes = [IsAuthenticated]
     """
     API để lấy chi tiết bệnh nhân theo ID.
     """
@@ -97,9 +97,9 @@ class PatientDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
->>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 
 class PatientViewSet(viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     """
     ViewSet quản lý bệnh nhân.
     """
@@ -235,12 +235,10 @@ class PatientViewSet(viewsets.ModelViewSet):
         instance.delete()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
-<<<<<<< HEAD
-=======
 
->>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 
 class DoctorListView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         doctors = Account.objects.filter(role="doctor").select_related("employee")
         data = [
@@ -259,6 +257,7 @@ class DoctorListView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 class MedicineListView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         medicines = Medicine.objects.all()
         data = [
@@ -275,6 +274,7 @@ class MedicineListView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 class PrescriptionViewSet(viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     queryset = Prescription.objects.all()
     def get_serializer_class(self):
         # Nếu là phương thức POST (create), sử dụng serializer tạo mới
@@ -485,3 +485,18 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
             raise ValidationError("Cannot delete a prescription that has an associated export receipt.")
 
         return super().destroy(request, *args, **kwargs)
+
+class PrescriptionListView(APIView):
+    # permission_classes = [IsAuthenticated]
+    def get(self, request):
+        doctor_id = request.query_params.get("doctor", None)
+
+        if doctor_id:
+            prescriptions = Prescription.objects.filter(doctor=doctor_id).order_by(
+                "-prescription_date"
+            )
+        else:
+            prescriptions = Prescription.objects.all().order_by("-prescription_date")
+        serializer = PrescriptionViewSerializer(prescriptions, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+

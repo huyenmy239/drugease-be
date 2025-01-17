@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Account,  Employee
 from django.contrib.auth.hashers import check_password, make_password
-
+from datetime import date, timedelta
 
 def generate_id_card():
     last_employee = Employee.objects.last()
@@ -53,6 +53,56 @@ class EmployeeSerializer(serializers.ModelSerializer):
         )
         account.save()
         return employee
+    
+
+    def validate_full_name(self, value):
+        """Kiểm tra full_name không được quá 50 ký tự và không rỗng"""
+        if not value.strip():
+            raise serializers.ValidationError("Full name cannot be empty.")
+        if len(value) > 10:
+            raise serializers.ValidationError("Full name must not exceed 50 characters.")
+        return value
+
+    def validate_date_of_birth(self, value):
+        """Kiểm tra ngày sinh không được là tương lai và người dùng phải đủ 18 tuổi"""
+        today = date.today()
+        min_age_date = today - timedelta(days=18*365)  # Cách tính đủ 18 tuổi (ước lượng 365 ngày mỗi năm)
+
+        if value > today:
+            raise serializers.ValidationError("Date of birth cannot be in the future.")
+        
+        if value > min_age_date:
+            raise serializers.ValidationError("Employee must be at least 18 years old.")
+        
+        return value
+
+    # def validate_phone_number(self, value):
+    #     """Kiểm tra định dạng số điện thoại"""
+    #     if not value.isdigit():
+    #         raise serializers.ValidationError("Phone number must contain only digits.")
+    #     if len(value) != 10:
+    #         raise serializers.ValidationError("Phone number must be exactly 10 digits.")
+    #     return value
+
+    def validate_email(self, value):
+        """Kiểm tra email không rỗng và định dạng hợp lệ"""
+        if not value.strip():
+            raise serializers.ValidationError("Email cannot be empty.")
+        return value
+
+    def validate_citizen_id(self, value):
+        """Kiểm tra citizen_id có độ dài chính xác"""
+        if len(value) != 12:
+            raise serializers.ValidationError("Citizen ID must be exactly 12 characters.")
+        if not value.isdigit():
+            raise serializers.ValidationError("Citizen ID must contain only digits.")
+        return value
+
+    def validate(self, data):
+        """Kiểm tra tính logic giữa các trường"""
+        if 'gender' in data and data['gender'] not in [True, False]:
+            raise serializers.ValidationError({"gender": "Gender must be either True (Male) or False (Female)."})
+        return data
 
 
 class EmployeeListSerializer(serializers.ModelSerializer):
