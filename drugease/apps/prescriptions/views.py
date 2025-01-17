@@ -276,14 +276,9 @@ class MedicineListView(APIView):
 class PrescriptionViewSet(viewsets.ModelViewSet):
     # permission_classes = [IsAuthenticated]
     queryset = Prescription.objects.all()
-    def get_serializer_class(self):
-        # Nếu là phương thức POST (create), sử dụng serializer tạo mới
-        if self.action == 'create':
-            return PrescriptionCreateSerializer
-        # Nếu không phải là POST (get, update, delete), sử dụng serializer xem
-        return PrescriptionViewSerializer
+    serializer_class = PrescriptionSerializer
+    # permission_classes = [IsAuthenticated]
 
-    #Lọc theo mã bác sĩ
     def get_queryset(self):
         queryset = super().get_queryset()
         doctor_id = self.request.query_params.get("doctor", None)
@@ -293,198 +288,71 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    #Tìm kiếm theo đơn thuốc
-    def retrieve(self, request, *args, **kwargs):
-        prescription = self.get_object()
-
-        # Serialize Prescription
-        serializer = PrescriptionViewSerializer(prescription)
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
     def create(self, request, *args, **kwargs):
-        serializer = PrescriptionCreateSerializer(data=request.data)
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         prescription = serializer.save()
 
-        patient_id = request.data.get("patient")
-        doctor_id = request.data.get("doctor")
-
-        try:
-            patient = Patient.objects.get(id=patient_id)
-        except Patient.DoesNotExist:
-            result = {
-                "statuscode": status.HTTP_404_NOT_FOUND,
-                "data": None,
-                "status": "error",
-                "errorMessage": "Patient with this ID does not exist."
-            }
-            return Response(result, status=status.HTTP_404_NOT_FOUND)
-
-        try:
-            doctor = Employee.objects.get(id=doctor_id)
-        except Employee.DoesNotExist:
-            result = {
-                "statuscode": status.HTTP_404_NOT_FOUND,
-                "data": None,
-                "status": "error",
-                "errorMessage": "Doctor with this ID does not exist."
-            }
-            return Response(result, status=status.HTTP_404_NOT_FOUND)
-
-        prescription.patient = patient
-        prescription.doctor = doctor
-        prescription.save()
-
         details_data = request.data.get("details", [])
-
         for detail_data in details_data:
-            medicine_id = detail_data.get("medicine")  
-            quantity = detail_data.get("quantity")
-
-            try:
-                medicine = Medicine.objects.get(id=medicine_id)
-            except Medicine.DoesNotExist:
-                result = {
-                    "statuscode": status.HTTP_404_NOT_FOUND,
-                    "data": None,
-                    "status": "error",
-                    "errorMessage": f"Medicine with ID {medicine_id} not found."
-                }
-                return Response(result, status=status.HTTP_404_NOT_FOUND)
-
-            if quantity > medicine.stock_quantity:
-                result = {
-                    "statuscode": status.HTTP_400_BAD_REQUEST,
-                    "data": None,
-                    "status": "error",
-                    "errorMessage": f"Not enough stock for medicine {medicine_id}. Available stock is {medicine.stock_quantity}."
-                }
-                return Response(result, status=status.HTTP_400_BAD_REQUEST)
-
-            medicine.stock_quantity -= quantity
-            medicine.save()
-
             detail_data["prescription"] = prescription.id
             detail_serializer = PrescriptionDetailSerializer(data=detail_data)
-
-            if not detail_serializer.is_valid():
-                result = {
-                    "statuscode": status.HTTP_400_BAD_REQUEST,
-                    "data": None,
-                    "status": "error",
-                    "errorMessage": detail_serializer.errors
-                }
-                return Response(result, status=status.HTTP_400_BAD_REQUEST)
-
+            detail_serializer.is_valid(raise_exception=True)
             detail_serializer.save()
 
-        result = {
-            "statuscode": status.HTTP_201_CREATED,
-            "data": PrescriptionViewSerializer(prescription).data,
-            "status": "success",
-            "errorMessage": None
-        }
-
-        return Response(result, status=status.HTTP_201_CREATED)
+        return Response(
+            PrescriptionSerializer(prescription).data, status=status.HTTP_201_CREATED
+        )
 
     def update(self, request, *args, **kwargs):
-        prescription_id = kwargs.get("pk")
-        try:
-            prescription = Prescription.objects.get(id=prescription_id)
-        except Prescription.DoesNotExist:
-            result = {
-                "statuscode": status.HTTP_404_NOT_FOUND,
-                "data": None,
-                "status": "error",
-                "errorMessage": f"Prescription with ID {prescription_id} does not exist."
-            }
-            return Response(result, status=status.HTTP_404_NOT_FOUND)
+        instance = self.get_object()
+        if hasattr(instance, "export_receipts"):
+            raise ValidationError(
+                "Cannot update a prescription that has an associated export receipt."
+            )
 
-        if hasattr(prescription, "export_receipts"):
-            result = {
-                "statuscode": status.HTTP_400_BAD_REQUEST,
-                "data": None,
-                "status": "error",
-                "errorMessage": "Cannot update a prescription that has an associated export receipt."
-            }
-            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+        partial = kwargs.pop("partial", False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        prescription = serializer.save()
 
-        prescription.diagnosis = request.data.get("diagnosis", prescription.diagnosis)
-        prescription.patient = request.data.get("patient", prescription.patient)
-        prescription.doctor = request.data.get("doctor", prescription.doctor)
-        prescription.save()
-
-        details_data = request.data.get("details", None)
-
-        if details_data is not None: 
-            old_details = PrescriptionDetail.objects.filter(prescription=prescription)
-
-            old_details.delete()
-
-            for detail_data in details_data:
-                medicine_id = detail_data.get("medicine")  
-                quantity = detail_data.get("quantity")
-
-                try:
-                    medicine = Medicine.objects.get(id=medicine_id)
-                except Medicine.DoesNotExist:
-                    result = {
-                        "statuscode": status.HTTP_404_NOT_FOUND,
-                        "data": None,
-                        "status": "error",
-                        "errorMessage": f"Medicine with ID {medicine_id} not found."
-                    }
-                    return Response(result, status=status.HTTP_404_NOT_FOUND)
-
-                if quantity > medicine.stock_quantity:
-                    result = {
-                        "statuscode": status.HTTP_400_BAD_REQUEST,
-                        "data": None,
-                        "status": "error",
-                        "errorMessage": f"Not enough stock for medicine {medicine_id}. Available stock is {medicine.stock_quantity}."
-                    }
-                    return Response(result, status=status.HTTP_400_BAD_REQUEST)
-
-                if old_details.exists():
-                    old_quantity = old_details.get(medicine_id=medicine_id).quantity
-                    if quantity < old_quantity:
-                        medicine.stock_quantity += (old_quantity - quantity)
-                    else:  
-                        medicine.stock_quantity = medicine.stock_quantity + old_quantity - quantity
-                else:
-                    medicine.stock_quantity -= quantity
-
-                medicine.save()
-
-                detail_data["prescription"] = prescription.id
-                detail_serializer = PrescriptionDetailSerializer(data=detail_data)
-                if not detail_serializer.is_valid():
-                    result = {
-                        "statuscode": status.HTTP_400_BAD_REQUEST,
-                        "data": None,
-                        "status": "error",
-                        "errorMessage": detail_serializer.errors
-                    }
-                    return Response(result, status=status.HTTP_400_BAD_REQUEST)
-                detail_serializer.save()
-
-        result = {
-            "statuscode": status.HTTP_200_OK,
-            "data": PrescriptionViewSerializer(prescription).data,
-            "status": "success",
-            "errorMessage": None
+        details_data = request.data.get("details", [])
+        existing_detail_ids = {
+            detail.get("id") for detail in details_data if "id" in detail
         }
 
-        return Response(result, status=status.HTTP_200_OK)
+        PrescriptionDetail.objects.filter(prescription=prescription).exclude(
+            id__in=existing_detail_ids
+        ).delete()
+
+        for detail_data in details_data:
+            if "id" in detail_data:
+                detail_instance = PrescriptionDetail.objects.get(
+                    id=detail_data["id"], prescription=prescription
+                )
+                detail_serializer = PrescriptionDetailSerializer(
+                    detail_instance, data=detail_data, partial=partial
+                )
+                detail_serializer.is_valid(raise_exception=True)
+                detail_serializer.save()
+            else:
+                detail_data["prescription"] = prescription.id
+                detail_serializer = PrescriptionDetailSerializer(data=detail_data)
+                detail_serializer.is_valid(raise_exception=True)
+                detail_serializer.save()
+
+        return Response(PrescriptionSerializer(prescription).data)
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
 
         if hasattr(instance, "export_receipts"):
-            raise ValidationError("Cannot delete a prescription that has an associated export receipt.")
+            raise ValidationError(
+                "Cannot delete a prescription that has an associated export receipt."
+            )
 
         return super().destroy(request, *args, **kwargs)
+
 
 class PrescriptionListView(APIView):
     # permission_classes = [IsAuthenticated]
