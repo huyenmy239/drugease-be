@@ -838,16 +838,16 @@ class ImportReceiptDetailsByIdAPIView(APIView):
             if pk:
                 # Lấy chi tiết cho phiếu nhập cụ thể
                 details = ImportReceiptDetail.objects.filter(import_receipt=pk)
-                if not details.exists():
-                    return Response(
-                        {
-                            "statuscode": status.HTTP_404_NOT_FOUND,
-                            "data": None,
-                            "status": "error",
-                            "errorMessage": "Không tìm thấy chi tiết cho phiếu nhập với ID đã cung cấp.",
-                        },
-                        status=status.HTTP_404_NOT_FOUND,
-                    )
+                # if not details.exists():
+                #     return Response(
+                #         {
+                #             "statuscode": status.HTTP_404_NOT_FOUND,
+                #             "data": None,
+                #             "status": "error",
+                #             "errorMessage": "Không tìm thấy chi tiết cho phiếu nhập với ID đã cung cấp.",
+                #         },
+                #         status=status.HTTP_404_NOT_FOUND,
+                #     )
             else:
                 # Lấy tất cả chi tiết
                 details = ImportReceiptDetail.objects.all()

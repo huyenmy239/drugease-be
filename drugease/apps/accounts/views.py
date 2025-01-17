@@ -71,6 +71,46 @@ class EmployeeList(APIView):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+class EmployeeListByRoleView(APIView):
+    """
+    APIView để lấy danh sách nhân viên theo role và is_active.
+    """
+
+    # permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        role = request.query_params.get("role", None)
+
+        if role is None:
+            return Response(
+                {
+                    "statusCode": status.HTTP_400_BAD_REQUEST,
+                    "status": "error",
+                    "data": None,
+                    "errorMessage": "role  parameters are required.",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        
+
+        employees = Employee.objects.filter(
+            account__role=role, is_active=True
+        ).values("id", "full_name")
+
+        data = list(employees)  # Convert QuerySet to list
+
+        return Response(
+            {
+                "statusCode": status.HTTP_200_OK,
+                "status": "success",
+                "data": data,
+                "errorMessage": None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class EmployeeViewSet(ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
@@ -112,7 +152,7 @@ class EmployeeViewSet(ModelViewSet):
         employee.is_active = False
         employee.save()
         return Response({'message': 'Employee deactivated successfully'}, status=status.HTTP_200_OK)
-    
+
 
 class RoleListView(APIView):
 
@@ -144,7 +184,7 @@ class ChangePasswordView(APIView):
             return Response({'detail': 'Password updated successfully.'}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 
 class EmployeeProfileView(APIView):
 
