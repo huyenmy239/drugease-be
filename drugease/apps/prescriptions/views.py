@@ -49,6 +49,7 @@ from django.db.models import Q
 
 
 class PatientListView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         patients = Patient.objects.all()
         serializer = PatientSerializer(patients, many=True)
@@ -56,6 +57,7 @@ class PatientListView(APIView):
 
 
 class PatientDetailView(APIView):
+    # permission_classes = [IsAuthenticated]
     """
     API để lấy chi tiết bệnh nhân theo ID.
     """
@@ -95,6 +97,7 @@ class PatientDetailView(APIView):
 
 
 class PatientViewSet(viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     """
     ViewSet quản lý bệnh nhân.
     """
@@ -233,6 +236,7 @@ class PatientViewSet(viewsets.ModelViewSet):
 
 
 class DoctorListView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         doctors = Account.objects.filter(role="doctor").select_related("employee")
         data = [
@@ -252,6 +256,7 @@ class DoctorListView(APIView):
 
 
 class MedicineListView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         medicines = Medicine.objects.all()
         data = [
@@ -269,6 +274,7 @@ class MedicineListView(APIView):
 
 
 class PrescriptionViewSet(viewsets.ModelViewSet):
+    # permission_classes = [IsAuthenticated]
     queryset = Prescription.objects.all()
     serializer_class = PrescriptionSerializer
     # permission_classes = [IsAuthenticated]
@@ -349,6 +355,7 @@ class PrescriptionViewSet(viewsets.ModelViewSet):
 
 
 class PrescriptionListView(APIView):
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         doctor_id = request.query_params.get("doctor", None)
 

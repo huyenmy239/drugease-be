@@ -52,19 +52,29 @@ class AccountViewSet(ModelViewSet):
 
         # Authenticate user
         account = Account.objects.filter(username=username).first()
-        if account and account.check_password(password):
-            token, _ = Token.objects.get_or_create(user=account)
-            return Response({
-                "token": token.key,
-                "username": account.username,
-                "role": account.role,
-                "employee_id": account.employee.id if account.employee else None
-            }, status=status.HTTP_200_OK)
+        if account:
+            if not account.is_active:
+                return Response(
+                    {"error": "Account is inactive. Please contact the administrator."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        
+            
+
+            if account.check_password(password):
+                token, _ = Token.objects.get_or_create(user=account)
+                return Response({
+                    "token": token.key,
+                    "username": account.username,
+                    "role": account.role,
+                    "employee_id": account.employee.id if account.employee else None
+                }, status=status.HTTP_200_OK)
 
         return Response({"error": "Invalid username or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class EmployeeList(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         employees = Employee.objects.all()
         serializer = EmployeeListSerializer(employees, many=True)
@@ -72,6 +82,7 @@ class EmployeeList(APIView):
 
 
 class EmployeeViewSet(ModelViewSet):
+    permission_classes = [IsAuthenticated]
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
 
@@ -96,6 +107,13 @@ class EmployeeViewSet(ModelViewSet):
         
         try:
             employee.save()
+
+            if 'is_active' in request.data:
+                account = getattr(employee, 'account', None)
+            if account:
+                account.is_active = employee.is_active
+                account.save()
+
         except IntegrityError as e:
             if 'phone_number' in str(e):
                 raise ValidationError({'phone_number': 'Phone number already exists.'})
@@ -115,6 +133,7 @@ class EmployeeViewSet(ModelViewSet):
     
 
 class RoleListView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
         roles = [{'value': choice[0], 'label': choice[1]} for choice in Account._meta.get_field('role').choices]
@@ -122,6 +141,7 @@ class RoleListView(APIView):
 
 
 class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, pk=None):
         try:
@@ -147,6 +167,7 @@ class ChangePasswordView(APIView):
     
 
 class EmployeeProfileView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, pk=None):
         try:

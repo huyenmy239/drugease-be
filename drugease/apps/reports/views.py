@@ -4,6 +4,7 @@ from django.utils.timezone import make_aware
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 
 from apps.prescriptions.models import Patient, Prescription, PrescriptionDetail
 from apps.warehouse.models import *
@@ -13,34 +14,34 @@ from datetime import datetime
 from jsonschema import ValidationError
 
 class NumberofPrescriptionsPrescribedReportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         prescriptions_data = (
-            Prescription.objects.annotate(prescription_day=TruncDate("prescription_date"))
-            .values("doctor__full_name", "prescription_day")
+            Prescription.objects.annotate(prescription_month=TruncMonth("prescription_date"))
+            .values("doctor__full_name", "prescription_month")
             .annotate(
                 total_prescriptions=Count("id"),
                 unexported_prescriptions=Count("id", filter=Q(export_receipts=None)),
                 exported_prescriptions=Count("id", filter=~Q(export_receipts=None)),
-                medicines_count=Sum("details__quantity"),
             )
-            .order_by("prescription_day", "doctor__full_name")
+            .order_by("prescription_month", "doctor__full_name")
         )
 
         report = []
         for data in prescriptions_data:
             report.append({
-                "date": data["prescription_day"],
+                "month": data["prescription_month"].strftime("%m/%Y"),
                 "doctor": data["doctor__full_name"],
                 "total_prescriptions": data["total_prescriptions"],
                 "unexported_prescriptions": data["unexported_prescriptions"],
                 "exported_prescriptions": data["exported_prescriptions"],
-                "medicines_count": data["medicines_count"] or 0,
             })
 
         return Response(report)
 
 
 class MedicationsinPrescriptionReportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         medicine_data = (
             PrescriptionDetail.objects
@@ -66,6 +67,7 @@ class MedicationsinPrescriptionReportAPIView(APIView):
     
 
 class MedicineExportReportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, *args, **kwargs):
         queryset = ExportReceiptDetail.objects.select_related(
             'export_receipt', 'medicine'
@@ -93,6 +95,7 @@ class MedicineExportReportAPIView(APIView):
     
 
 class DoctorReportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, *args, **kwargs):
         queryset = Prescription.objects.filter(
             export_receipts__export_date__gte=F('prescription_date')
@@ -126,6 +129,7 @@ class DoctorReportAPIView(APIView):
     
 
 class PharmacistReportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, *args, **kwargs):
         queryset = ExportReceipt.objects.select_related('employee').filter(
             is_approved=True
@@ -162,6 +166,7 @@ class PharmacistReportAPIView(APIView):
     
 
 class MedicineRevenueReportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request, *args, **kwargs):
         # Truy vấn dữ liệu từ ExportReceiptDetail
         queryset = ExportReceiptDetail.objects.select_related(
@@ -174,23 +179,43 @@ class MedicineRevenueReportAPIView(APIView):
         ).values(
             'month', 'medicine__medicine_name'
         ).annotate(
-            total_revenue=Sum('revenue', output_field=FloatField())  # Tổng doanh thu theo thuốc và tháng
+            total_revenue=Sum('revenue', output_field=FloatField()),  # Tổng doanh thu theo thuốc và tháng
         ).order_by('month', 'medicine__medicine_name')
 
-        # Định dạng dữ liệu trả về
-        data = [
-            {
-                "Thời Gian": entry['month'].strftime('%m/%Y') if entry['month'] else None,
-                "Loại Thuốc": entry['medicine__medicine_name'],
-                "Doanh Thu": f"{entry['total_revenue']:,.0f}"  # Định dạng doanh thu
-            }
-            for entry in queryset
-        ]
+        # Tính toán chi phí và lợi nhuận theo từng tháng
+        data = []
+        for entry in queryset:
+            month = entry['month']
+            medicine_name = entry['medicine__medicine_name']
+
+            # Lấy tổng chi phí nhập trong cùng tháng
+            import_details = ImportReceiptDetail.objects.filter(
+                import_receipt__import_date__month=month.month,
+                import_receipt__import_date__year=month.year,
+                medicine__medicine_name=medicine_name
+            ).aggregate(
+                total_cost=Sum(F('quantity') * F('price'), output_field=FloatField())
+            )
+            total_cost = import_details['total_cost'] or 0  # Chi phí mặc định là 0 nếu không có dữ liệu
+
+            # Tính lợi nhuận
+            total_revenue = entry['total_revenue']
+            profit = total_revenue - total_cost
+
+            # Thêm dữ liệu vào danh sách trả về
+            data.append({
+                "time": month.strftime('%m/%Y') if month else None,
+                "medicine_name": medicine_name,
+                "cost": f"{total_cost:,.0f}",  # Định dạng chi phí
+                "revenue": f"{total_revenue:,.0f}",  # Định dạng doanh thu
+                "profit": f"{profit:,.0f}",  # Định dạng lợi nhuận
+            })
 
         return Response(data)
     
 
 class ReportInventory(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             # Lấy tất cả thuốc
@@ -244,6 +269,7 @@ class ReportInventory(APIView):
 
 
 class ReportImportReceipt(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             # Nhận các tham số từ request
@@ -325,6 +351,7 @@ class ReportImportReceipt(APIView):
 
 
 class ReportEmployeeActivity(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             # Nhận các tham số từ request
@@ -416,6 +443,7 @@ class ReportEmployeeActivity(APIView):
         
 
 class ReportPatient(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
 
@@ -485,6 +513,7 @@ class ReportPatient(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ReportMedicineCost(APIView):
+    permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             # Lấy tham số từ query
