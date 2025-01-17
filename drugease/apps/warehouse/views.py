@@ -1,13 +1,9 @@
 from rest_framework import serializers
 
 
-<<<<<<< HEAD
-from .models import Medicine, ImportReceiptDetail, ExportReceiptDetail
-from apps.prescriptions.models import PrescriptionDetail
-=======
+
 from .models import *
 from apps.prescriptions.models import Prescription, PrescriptionDetail
->>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets, status
@@ -30,10 +26,6 @@ import re
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import permission_classes
 
-<<<<<<< HEAD
-import re
-=======
->>>>>>> 221eb584e957ca1f61a11301cdea0185cb16971d
 
 #View for Medicine
 # @permission_classes([IsAuthenticated])
