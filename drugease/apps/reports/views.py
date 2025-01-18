@@ -96,31 +96,37 @@ class MedicineExportReportAPIView(APIView):
 
 class DoctorReportAPIView(APIView):
     permission_classes = [IsAuthenticated]
+
     def get(self, request, *args, **kwargs):
+        # Gộp theo bác sĩ và tháng
         queryset = Prescription.objects.filter(
             export_receipts__export_date__gte=F('prescription_date')
         ).select_related('doctor').annotate(
             doctor_name=F('doctor__full_name'),
-            num_prescriptions=Count('id', distinct=True),
+            month=TruncMonth('prescription_date'),  # Gộp theo tháng
+        ).values(
+            'doctor_name',
+            'month'
+        ).annotate(
+            num_prescriptions=Count('id', distinct=True),  # Tổng số đơn thuốc trong tháng
             avg_time=Avg(
                 ExpressionWrapper(
                     F('export_receipts__export_date') - F('prescription_date'),
                     output_field=DurationField()
                 )
             )
-        ).values(
-            'doctor_name',
-            'num_prescriptions',
-            'avg_time'
-        )
+        ).order_by('-month')
 
+        # Tạo danh sách kết quả
         data = []
         for entry in queryset:
             avg_minutes = None
             if entry['avg_time']:
                 avg_minutes = round(entry['avg_time'].total_seconds() / 60, 2)  # Chuyển đổi sang phút
+            
             data.append({
                 "doctor_name": entry['doctor_name'],
+                "month": entry['month'].strftime('%Y-%m'),  # Định dạng tháng (yyyy-mm)
                 "num_prescriptions": entry['num_prescriptions'],
                 "avg_minutes": avg_minutes
             })
@@ -215,7 +221,7 @@ class MedicineRevenueReportAPIView(APIView):
     
 
 class ReportInventory(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             # Lấy tất cả thuốc
@@ -269,7 +275,7 @@ class ReportInventory(APIView):
 
 
 class ReportImportReceipt(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             # Nhận các tham số từ request
@@ -351,7 +357,7 @@ class ReportImportReceipt(APIView):
 
 
 class ReportEmployeeActivity(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             # Nhận các tham số từ request
@@ -443,10 +449,9 @@ class ReportEmployeeActivity(APIView):
         
 
 class ReportPatient(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
-
             year = request.query_params.get('year', None)
             month = request.query_params.get('month', None)
             day = request.query_params.get('day', None)
@@ -492,13 +497,16 @@ class ReportPatient(APIView):
             else:
                 time_period = f"{day}/{month}/{year}" if day else f"{month}/{year}" if month else f"{year}"
 
+            patient_list = patients.values('id','full_name', 'date_of_birth', 'address', 'registration_date', 'insurance')
+
             return Response({
                 "statuscode": status.HTTP_200_OK,
                 "data": {
                     "Thời gian": time_period,
                     "Nam": male_count,
                     "Nữ": female_count,
-                    "Tổng": total
+                    "Tổng": total,
+                    "Danh sách bệnh nhân": list(patient_list)  # Chuyển QuerySet thành danh sách
                 },
                 "status": "success",
                 "errorMessage": None
@@ -512,8 +520,9 @@ class ReportPatient(APIView):
                 "errorMessage": str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 class ReportMedicineCost(APIView):
-    permission_classes = [IsAuthenticated]
+    # permission_classes = [IsAuthenticated]
     def get(self, request):
         try:
             # Lấy tham số từ query

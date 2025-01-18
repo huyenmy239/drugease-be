@@ -9,6 +9,7 @@ from rest_framework.exceptions import ValidationError
 from django.db import IntegrityError
 from django.contrib.auth.hashers import make_password, check_password
 from django.contrib.auth import authenticate
+from django.db.models import Q
 from .models import Account, Employee
 from .serializers import *
 
@@ -75,11 +76,26 @@ class AccountViewSet(ModelViewSet):
 
 class EmployeeList(APIView):
     permission_classes = [IsAuthenticated]
-    def get(self, request):
-        employees = Employee.objects.all()
-        serializer = EmployeeListSerializer(employees, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+    # def get(self, request):
+    #     employees = Employee.objects.all()
+    #     serializer = EmployeeListSerializer(employees, many=True)
+    #     return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def get(self, request):
+        query = request.query_params.get('query', None)  # Lấy tham số 'query'
+        queryset = Employee.objects.all()
+
+        if query:
+            queryset = queryset.filter(
+                Q(full_name__icontains=query) |
+                Q(id_card__icontains=query) |
+                Q(phone_number__icontains=query) |
+                Q(email__icontains=query)
+            )
+
+        serializer = EmployeeListSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
 
 class EmployeeListByRoleView(APIView):
     """
@@ -145,6 +161,11 @@ class EmployeeViewSet(ModelViewSet):
             if field in request.data:
                 setattr(employee, field, request.data[field])
         
+        serializer = self.get_serializer(employee, data=request.data, partial=True)
+        
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         try:
             employee.save()
 

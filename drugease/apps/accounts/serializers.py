@@ -59,7 +59,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         """Kiểm tra full_name không được quá 50 ký tự và không rỗng"""
         if not value.strip():
             raise serializers.ValidationError("Full name cannot be empty.")
-        if len(value) > 10:
+        if len(value) > 50:
             raise serializers.ValidationError("Full name must not exceed 50 characters.")
         return value
 
@@ -76,13 +76,13 @@ class EmployeeSerializer(serializers.ModelSerializer):
         
         return value
 
-    # def validate_phone_number(self, value):
-    #     """Kiểm tra định dạng số điện thoại"""
-    #     if not value.isdigit():
-    #         raise serializers.ValidationError("Phone number must contain only digits.")
-    #     if len(value) != 10:
-    #         raise serializers.ValidationError("Phone number must be exactly 10 digits.")
-    #     return value
+    def validate_phone_number(self, value):
+        """Kiểm tra định dạng số điện thoại"""
+        if not value.isdigit():
+            raise serializers.ValidationError("Phone number must contain only digits.")
+        if len(value) < 10 or len(value) > 11:
+            raise serializers.ValidationError("Phone number must be between 10 and 11 digits.")
+        return value
 
     def validate_email(self, value):
         """Kiểm tra email không rỗng và định dạng hợp lệ"""

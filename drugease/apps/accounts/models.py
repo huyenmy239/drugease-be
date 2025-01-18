@@ -7,7 +7,7 @@ class Employee(models.Model):
     date_of_birth = models.DateField(null=False)
     gender = models.BooleanField(default=0)
     id_card = models.CharField(max_length=12, unique=True, null=False)
-    phone_number = models.CharField(unique=True, max_length=12, null=False)
+    phone_number = models.CharField(unique=True, max_length=11, null=False)
     address = models.CharField(max_length=200, null=False)
     email = models.EmailField(unique=True, null=False)
     image = models.ImageField(upload_to='employee_images/', default='employee_images/default.png')

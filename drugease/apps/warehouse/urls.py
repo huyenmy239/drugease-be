@@ -51,4 +51,5 @@ urlpatterns = [
     path('warehouses-list/', WarehouseListView.as_view(), name='warehouses-list'),
     path('unexportedprescription-list/', PrescriptionWithoutExportView.as_view(), name='unexportedprescription-list'),
     path('export-list/', ExportReceiptListView.as_view(), name='export-list'),
+    path('export-search/', ExportReceiptSearchView.as_view(), name='export-search'),
 ]

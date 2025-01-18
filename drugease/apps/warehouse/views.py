@@ -1257,3 +1257,32 @@ class ExportReceiptViewSet (viewsets.ModelViewSet):
 
         return super().destroy(request, *args, **kwargs)
     
+
+class ExportReceiptSearchView(APIView):
+    
+    def get(self, request):
+        
+        warehouse = request.GET.get('warehouse', None)
+        export_date = request.GET.get('export_date', None)
+        prescription = request.GET.get('prescription', None)
+        is_approved = request.GET.get('is_approved', None)
+        
+        queryset = ExportReceipt.objects.all()
+
+        if warehouse:
+            queryset = queryset.filter(warehouse__id=warehouse)
+
+        if export_date:
+            queryset = queryset.filter(export_date__date=export_date)
+
+        if prescription:
+            queryset = queryset.filter(prescription__id=prescription)
+
+        if is_approved is not None:
+            if is_approved == 'true':
+                queryset = queryset.filter(is_approved=True)
+            elif is_approved == 'false':
+                queryset = queryset.filter(is_approved=False)
+
+        serializer = ExportReceiptViewSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

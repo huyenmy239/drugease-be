@@ -149,7 +149,94 @@ class PatientViewSet(viewsets.ModelViewSet):
         Thêm bệnh nhân mới.
         """
         serializer = self.get_serializer(data=request.data)
+        
+        # Kiểm tra tính hợp lệ của dữ liệu đầu vào
         if serializer.is_valid():
+            date_of_birth = request.data.get('date_of_birth')
+            if date_of_birth:
+                try:
+                    birth_date = datetime.strptime(date_of_birth, '%Y-%m-%d')  # Chuyển đổi chuỗi ngày sinh thành đối tượng datetime
+                    age = (datetime.now() - birth_date).days // 365  # Tính tuổi
+                    if age < 15:
+                        return Response(
+                            {
+                                "statusCode": status.HTTP_400_BAD_REQUEST,
+                                "status": "error",
+                                "errorMessage": {"date_of_birth": ["Bệnh nhân phải lớn hơn 15 tuổi."]},
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                except ValueError:
+                    return Response(
+                        {
+                            "statusCode": status.HTTP_400_BAD_REQUEST,
+                            "status": "error",
+                            "errorMessage": {"date_of_birth": ["Ngày sinh không hợp lệ."]},
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            # Kiểm tra email
+            email = request.data.get('email')
+            if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+                return Response(
+                    {
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "status": "error",
+                        "errorMessage": {"email": ["Enter a valid email address."]},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Kiểm tra số điện thoại
+            phone = request.data.get('phone')
+            if phone and (len(phone) < 10 or len(phone) > 20 or not phone.isdigit()):
+                return Response(
+                    {
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "status": "error",
+                        "errorMessage": {"phone": ["Phone number must be between 10 and 20 digits."]},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Kiểm tra id_card (12 chữ số)
+            id_card = request.data.get('id_card')
+            if id_card and (len(id_card) != 12 or not id_card.isdigit()):
+                return Response(
+                    {
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "status": "error",
+                        "errorMessage": {"id_card": ["ID card must be exactly 12 digits."]},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Kiểm tra insurance (phải nhỏ hơn 1)
+            insurance = request.data.get('insurance')
+            if insurance and (float(insurance) >= 1):
+                return Response(
+                    {
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "status": "error",
+                        "errorMessage": {"insurance": ["Insurance must be less than 1."]},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Kiểm tra tên không chứa ký tự đặc biệt
+            name = request.data.get('full_name')
+            if name and re.search(r'[^a-zA-Z0-9\s]', name):
+                return Response(
+                    {
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "status": "error",
+                        "errorMessage": {"name": ["Name cannot contain special characters."]},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Lưu dữ liệu nếu hợp lệ
             serializer.save()
             return Response(
                 {
@@ -160,14 +247,26 @@ class PatientViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_201_CREATED,
             )
+
+        # Xử lý lỗi chung
+        error_messages = {}
+
+        if 'email' in serializer.errors:
+            error_messages['email'] = ["Enter đã tồn tại."]
+        if 'employee' in serializer.errors:
+            error_messages['employee'] = ["Lấy mã nhân viên không thành công."]
+        if 'insurance' in serializer.errors:
+            error_messages['insurance'] = ["Bảo hiểm phải là số hợp lệ"]
+        
         return Response(
             {
                 "statusCode": status.HTTP_400_BAD_REQUEST,
                 "status": "error",
-                "errorMessage": serializer.errors,
+                "errorMessage": error_messages,
             },
             status=status.HTTP_400_BAD_REQUEST,
         )
+
 
     def update(self, request, *args, **kwargs):
         """
@@ -191,6 +290,42 @@ class PatientViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+        # Kiểm tra số điện thoại hợp lệ
+        if "phone_number" in update_data:
+            phone_number = update_data["phone_number"]
+            if not phone_number.isdigit() or not (10 <= len(phone_number) <= 20):
+                return Response(
+                    {
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "status": "error",
+                        "errorMessage": {"phone_number": ["Số điện thoại phải là chuỗi số từ 10 đến 20 ký tự!"]},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        if "insurance" in update_data:
+            insurance = update_data["insurance"]
+            try:
+                insurance = float(insurance)
+                if insurance > 1:
+                    return Response(
+                        {
+                            "statusCode": status.HTTP_400_BAD_REQUEST,
+                            "status": "error",
+                            "errorMessage": {"insurance": ["Bảo hiểm không thể lớn hơn 1!"]},
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            except ValueError:
+                return Response(
+                    {
+                        "statusCode": status.HTTP_400_BAD_REQUEST,
+                        "status": "error",
+                        "errorMessage": {"insurance": ["Bảo hiểm phải là một số hợp lệ!"]},
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         # Sử dụng serializer với partial = True để cập nhật một số trường
         serializer = PatientSerializer(instance, data=update_data, partial=True)
@@ -227,7 +362,7 @@ class PatientViewSet(viewsets.ModelViewSet):
                     "statusCode": status.HTTP_400_BAD_REQUEST,
                     "status": "error",
                     "data": None,
-                    "errorMessage": "Bệnh nhân không thể xóa vì có liên kết với phiếu xuất.",
+                    "errorMessage": "Bệnh nhân không thể xóa vì có liên kết với đơn thuốc.",
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
@@ -358,13 +493,22 @@ class PrescriptionListView(APIView):
     # permission_classes = [IsAuthenticated]
     def get(self, request):
         doctor_id = request.query_params.get("doctor", None)
+        query = request.query_params.get('query', None)  # Lấy tham số 'query'
+        queryset = Prescription.objects.all()
+
+        if query:
+            queryset = queryset.filter(
+                Q(doctor__full_name__icontains=query) |
+                Q(diagnosis__icontains=query)
+            )
 
         if doctor_id:
             prescriptions = Prescription.objects.filter(doctor=doctor_id).order_by(
                 "-prescription_date"
             )
+        elif query:
+            prescriptions = queryset
         else:
             prescriptions = Prescription.objects.all().order_by("-prescription_date")
         serializer = PrescriptionViewSerializer(prescriptions, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
