@@ -127,8 +127,6 @@ class MedicineViewSet(viewsets.ModelViewSet):
             if Medicine.objects.filter(medicine_name=medicine_name).exists():
                 return self._error_response(status.HTTP_400_BAD_REQUEST, "Tên thuốc đã tồn tại.")
 
-            if ImportReceiptDetail.objects.filter(medicine=instance).exists() or ExportReceiptDetail.objects.filter(medicine=instance).exists():
-                return self._error_response(status.HTTP_400_BAD_REQUEST, "Không thể cập nhật thuốc đã tồn tại trong phiếu nhập hoặc phiếu xuất.")
 
             if "stock_quantity" in request.data:
                 del request.data["stock_quantity"]

@@ -3,6 +3,7 @@ from rest_framework import serializers
 from .models import Patient, Prescription, PrescriptionDetail
 from apps.accounts.models import Employee
 from apps.warehouse.models import Medicine
+import re
 
 class DoctorField(serializers.PrimaryKeyRelatedField):
     def get_queryset(self):

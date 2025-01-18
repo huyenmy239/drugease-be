@@ -177,7 +177,8 @@ class PatientViewSet(viewsets.ModelViewSet):
                     )
 
             # Kiểm tra email
-            email = request.data.get('email')
+            email =request.data.get('emai')
+
             if email and not re.match(r"[^@]+@[^@]+\.[^@]+", email):
                 return Response(
                     {
@@ -189,7 +190,7 @@ class PatientViewSet(viewsets.ModelViewSet):
                 )
 
             # Kiểm tra số điện thoại
-            phone = request.data.get('phone')
+            phone = request.data.get('phone_number')
             if phone and (len(phone) < 10 or len(phone) > 20 or not phone.isdigit()):
                 return Response(
                     {
@@ -226,7 +227,7 @@ class PatientViewSet(viewsets.ModelViewSet):
 
             # Kiểm tra tên không chứa ký tự đặc biệt
             name = request.data.get('full_name')
-            if name and re.search(r'[^a-zA-Z0-9\s]', name):
+            if name and re.search(r'[^a-zA-Z0-9\sÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơĂĨŨƠăĩũơẠ-ỹ]', name):
                 return Response(
                     {
                         "statusCode": status.HTTP_400_BAD_REQUEST,
@@ -252,7 +253,7 @@ class PatientViewSet(viewsets.ModelViewSet):
         error_messages = {}
 
         if 'email' in serializer.errors:
-            error_messages['email'] = ["Enter đã tồn tại."]
+            error_messages['email'] = ["Email đã tồn tại."]
         if 'employee' in serializer.errors:
             error_messages['employee'] = ["Lấy mã nhân viên không thành công."]
         if 'insurance' in serializer.errors:
