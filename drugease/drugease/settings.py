@@ -101,9 +101,9 @@ WSGI_APPLICATION = "drugease.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "drugease",
+        "NAME": "drugease_test",
         "USER": "root",
-        "PASSWORD": "239003",  # 239003
+        "PASSWORD": "460079",  # 239003
         "HOST": "localhost",
         "PORT": "3306",
     }

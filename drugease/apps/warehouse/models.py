@@ -92,6 +92,7 @@ class ExportReceiptDetail(models.Model):
     insurance_covered = models.BooleanField(default=True)
     ins_amount = models.FloatField(default=0)
     patient_pay = models.FloatField(default=0)
+    note = models.CharField(max_length=100,  null=True, blank=True)
 
     class Meta:
         db_table = "export_receipt_detail"

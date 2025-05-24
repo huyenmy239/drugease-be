@@ -215,7 +215,7 @@ class ExportReceiptDetailsViewSerializer (serializers.ModelSerializer):
     medicine = MedicineSerializer()
     class Meta:
         model = ExportReceiptDetail
-        fields = ['id', 'export_receipt', 'medicine', 'quantity', 'price', 'insurance_covered', 'ins_amount', 'patient_pay']
+        fields = ['id', 'export_receipt', 'medicine', 'quantity', 'price', 'insurance_covered', 'ins_amount', 'patient_pay', 'note']
 
 
 class ExportReceiptDetailsSerializer (serializers.ModelSerializer):
@@ -223,7 +223,7 @@ class ExportReceiptDetailsSerializer (serializers.ModelSerializer):
     medicine_name = serializers.ReadOnlyField(source='medicine.medicine_name')
     class Meta:
         model = ExportReceiptDetail
-        fields = ['id', 'export_receipt', 'medicine', 'medicine_name','quantity', 'price', 'insurance_covered', 'ins_amount', 'patient_pay']
+        fields = ['id', 'export_receipt', 'medicine', 'medicine_name','quantity', 'price', 'insurance_covered', 'ins_amount', 'patient_pay', 'note']
 
 
 class ExportReceiptViewSerializer (serializers.ModelSerializer):
