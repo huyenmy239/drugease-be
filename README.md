@@ -36,9 +36,9 @@ Drugease là một hệ thống webservice giúp quản lý đơn thuốc trong 
 
 ## Công Nghệ Sử Dụng
 
-- **Web Framework:** Django
-- **Cơ Sở Dữ Liệu:** MySQL
-- **Web Service:** RESTful API
+- **Web Framework:** Django.
+- **Cơ Sở Dữ Liệu:** MySQL.
+- **Web Service:** RESTful API.
 - **Bảo Mật:** Xác thực người dùng, mã hóa dữ liệu nhạy cảm và bảo mật API.
 
 ## Cài Đặt
