@@ -78,6 +78,10 @@ Tương tự, khởi động server phát triển Django bằng cách chạy l�
 python manage.py runserver
 ```
 
+### 6. kết nối với Frontend
+
+- **Backend Link:** [Drugease Frontend](https://github.com/huyenmy239/drugease-fe)
+
 ## API
 
 ### Tài Khoản
