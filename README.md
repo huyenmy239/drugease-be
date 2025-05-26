@@ -80,7 +80,7 @@ python manage.py runserver
 
 ### 6. kết nối với Frontend
 
-- **Backend Link:** [Drugease Frontend](https://github.com/huyenmy239/drugease-fe)
+- **Frontend Link:** [Drugease Frontend](https://github.com/huyenmy239/drugease-fe)
 
 ## API
 
